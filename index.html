@@ -482,6 +482,168 @@
       color: #fff;
       font-weight: 600;
     }
+    /* --- Map Select (placeholder) --- */
+    #map-select-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 22, 0.88);
+      backdrop-filter: blur(8px);
+      display: none;
+      z-index: 80;
+      overflow-y: auto;
+    }
+
+    #map-select-content {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 0 20px;
+      text-align: center;
+    }
+
+    #map-select-content h1 {
+      font-family: var(--font-title);
+      font-size: 38px;
+      color: var(--primary-gold);
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    #map-select-content p {
+      color: #cfd8dc;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+
+    #map-select-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .map-card {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--text-light);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .map-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--primary-gold);
+    }
+
+    .map-card-title {
+      font-family: var(--font-title);
+      font-size: 18px;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .map-card-sub {
+      font-size: 12px;
+      color: #9fb0c2;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .map-card-reward {
+      font-size: 13px;
+      color: var(--primary-gold);
+      font-weight: 700;
+    }
+    /* --- Run End Menu --- */
+    #run-end-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 12, 22, 0.82);
+      backdrop-filter: blur(6px);
+      display: none;
+      z-index: 90;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    #run-end-panel {
+      width: min(460px, 92vw);
+      background: rgba(20, 24, 36, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 16px;
+      padding: 26px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      text-align: center;
+    }
+
+    #run-end-panel h2 {
+      font-family: var(--font-title);
+      color: var(--primary-gold);
+      font-size: 30px;
+      margin-bottom: 14px;
+      letter-spacing: 1px;
+    }
+
+    #run-end-peak-wrap {
+      color: #d8e2ea;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
+    #run-end-peak {
+      display: inline-block;
+      margin-left: 8px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 26px;
+    }
+
+    .run-end-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .run-end-btn {
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-light);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .run-end-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--primary-gold);
+    }
+    #dev-buffs {
+      margin-top: 6px;
+      padding: 8px 10px;
+      min-width: 220px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px dashed rgba(255, 255, 255, 0.35);
+      border-radius: 10px;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #d7e2ee;
+      text-align: left;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+      pointer-events: none;
+    }
+
+    .dev-buff-title {
+      color: #ffd740;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: 0.4px;
+    }
   </style>
 </head>
 <body>
@@ -498,6 +660,7 @@
       </div>
       <div id="hud-right">
         <span id="hud-height">0m</span>
+        <div id="dev-buffs"></div>
       </div>
     </div>
 
@@ -528,6 +691,27 @@
       <div id="log-panel"></div>
     </div>
 
+
+    <!-- Map select overlay (placeholder) -->
+    <div id="map-select-overlay">
+      <div id="map-select-content">
+        <h1>Select Map</h1>
+        <p>Placeholder map copies: choose one reward-focused map to start.</p>
+        <div id="map-select-list"></div>
+      </div>
+    </div>
+
+    <!-- Run end menu -->
+    <div id="run-end-overlay">
+      <div id="run-end-panel">
+        <h2>Run Ended</h2>
+        <div id="run-end-peak-wrap">Peak Height:<span id="run-end-peak">0m</span></div>
+        <div class="run-end-actions">
+          <button id="run-end-continue-btn" class="run-end-btn">Continue</button>
+          <button id="run-end-map-btn" class="run-end-btn">Back To Maps</button>
+        </div>
+      </div>
+    </div>
     <!-- Shop overlay -->
     <div id="shop-overlay">
       <div id="shop-content">
@@ -551,3 +735,4 @@
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
+

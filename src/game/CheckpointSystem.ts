@@ -1,49 +1,63 @@
-import { CHECKPOINTS, MILESTONES, CHECKPOINT_COLLECT_ANIMATION_DURATION } from '../config';
+import {
+  CHECKPOINT_COLLECT_ANIMATION_DURATION,
+  MAP_TEMPLATES,
+  MILESTONES,
+  MapRewardType,
+} from '../config';
 import { PersistentState } from '../player/PlayerState';
-import { addCurrency } from '../player/CurrencyManager';
-
-export interface CheckpointEvent {
-  index: number;
-  reward: { obolus: number; drachma: number; stater: number };
-}
-
-export interface MilestoneEvent {
-  height: number;
-  ingotReward: number;
-}
 
 export class CheckpointSystem {
-  /** Checkpoint indices collected this run */
   collectedThisRun: number[] = [];
 
-  /** Pending notification text and timer */
   notification: string | null = null;
   notificationTimer = 0;
 
-  /** Check if any new checkpoints have been passed */
-  checkProgress(currentHeight: number, persistent: PersistentState, runEarnings: { obolus: number; drachma: number; stater: number; ingot: number }): void {
-    // Check regular checkpoints
-    for (let i = 0; i < CHECKPOINTS.length; i++) {
-      if (this.collectedThisRun.includes(i)) continue;
-      const cp = CHECKPOINTS[i];
-      if (currentHeight >= cp.height) {
-        this.collectedThisRun.push(i);
-        addCurrency(persistent, cp.reward);
-        runEarnings.obolus += cp.reward.obolus;
-        runEarnings.drachma += cp.reward.drachma;
-        runEarnings.stater += cp.reward.stater;
+  private activeMapIndex = 0;
 
-        // Build notification
-        const parts: string[] = [];
-        if (cp.reward.obolus > 0) parts.push(`+${cp.reward.obolus} Obolus`);
-        if (cp.reward.drachma > 0) parts.push(`+${cp.reward.drachma} Drachma`);
-        if (cp.reward.stater > 0) parts.push(`+${cp.reward.stater} Stater`);
-        this.notification = parts.join('  ');
-        this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
+  setActiveMapIndex(index: number): void {
+    this.activeMapIndex = Math.max(0, Math.min(index, MAP_TEMPLATES.length - 1));
+  }
+
+  private applyMapReward(persistent: PersistentState, rewardType: MapRewardType, rewardAmount: number): void {
+    switch (rewardType) {
+      case 'staminaMaxGrowth': {
+        persistent.mapRewards.staminaMaxGrowth += rewardAmount;
+        return;
+      }
+      case 'thresholdReduction': {
+        persistent.mapRewards.thresholdReduction += rewardAmount;
+        return;
+      }
+      case 'pushDistanceBonus': {
+        persistent.mapRewards.pushDistanceBonus += rewardAmount;
+        return;
+      }
+      case 'staminaCostGrowthReduction': {
+        persistent.mapRewards.staminaCostGrowthReduction += rewardAmount;
+        return;
       }
     }
+  }
 
-    // Check milestones (first-time only)
+  /**
+   * Inverse reward per successful push:
+   * reward = baseRewardPerPush / (1 + mapPushCount)
+   */
+  applyPushBuff(persistent: PersistentState): void {
+    const map = MAP_TEMPLATES[this.activeMapIndex];
+    const pushCount = persistent.mapPushCounts[map.id] ?? 0;
+    const rewardAmount = map.rewardPerPush / (1 + pushCount);
+
+    this.applyMapReward(persistent, map.rewardType, rewardAmount);
+    persistent.mapPushCounts[map.id] = pushCount + 1;
+  }
+
+  checkProgress(
+    currentHeight: number,
+    persistent: PersistentState,
+    runEarnings: { obolus: number; drachma: number; stater: number; ingot: number },
+  ): void {
+    // Preserve existing first-time milestone ingot rewards.
     for (const ms of MILESTONES) {
       if (currentHeight >= ms.height && !persistent.claimedMilestones.includes(ms.height)) {
         persistent.claimedMilestones.push(ms.height);
@@ -55,13 +69,11 @@ export class CheckpointSystem {
       }
     }
 
-    // Update highest ever
     if (currentHeight > persistent.highestEver) {
       persistent.highestEver = currentHeight;
     }
   }
 
-  /** Update notification timer */
   update(dt: number): void {
     if (this.notificationTimer > 0) {
       this.notificationTimer -= dt;
@@ -71,7 +83,6 @@ export class CheckpointSystem {
     }
   }
 
-  /** Reset for new run */
   reset(): void {
     this.collectedThisRun = [];
     this.notification = null;

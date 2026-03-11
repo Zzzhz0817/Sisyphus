@@ -7,6 +7,9 @@
 export const JUDGMENT_BAR_TOTAL_WIDTH = 300;      // px
 export const JUDGMENT_BAR_HEIGHT = 24;             // px (thicker)
 export const JUDGMENT_POINTER_SPEED = 200;         // px/s
+export const JUDGMENT_HOLD_SUCCESS_TIME = 0.45;    // s, default hold duration needed for success
+export const JUDGMENT_HOLD_SUCCESS_TIME_MIN = 0.15;// s, lower clamp after threshold-reduction rewards
+export const JUDGMENT_HOLD_BAR_MULTIPLIER = 3;     // bar covers 0..(multiplier * default success time)
 export const JUDGMENT_SUCCESS_COLOR = '#00E676';   // Neon Green
 export const JUDGMENT_FAIL_COLOR = '#FF5252';      // Vibrant Red
 export const JUDGMENT_POINTER_COLOR = '#FFD740';   // Amber/Gold
@@ -16,6 +19,8 @@ export const JUDGMENT_BAR_Y_OFFSET = -50;          // px above character head
 export const STAMINA_MAX_BASE = 100;
 export const STAMINA_COST_PER_SUCCESS = 10;
 export const STAMINA_REGEN_RATE_BASE = 0.25;       // points/s
+export const STAMINA_COST_MAX_PER_SUCCESS_BASE = 9; // cap per-push stamina cost (lowered)
+export const STAMINA_COST_GROWTH_PER_PUSH_BASE = 0.5; // extra stamina cost added after each success in a run
 export const SUCCESS_ZONE_MAX_RATIO = 0.6;
 export const SUCCESS_ZONE_MIN_WIDTH = 5;           // px
 
@@ -31,21 +36,33 @@ export const SLIDE_MAX_SPEED = 400;                // game units/s
 export const PUSH_DISTANCE_BASE = 40;              // game units per success
 export const PUSH_ANIMATION_DURATION = 0.32;       // seconds for push easing animation
 
-// --- Checkpoints ---
-export interface CheckpointConfig {
-  height: number;
-  reward: { obolus: number; drachma: number; stater: number };
+// --- Maps / Checkpoints ---
+export type MapRewardType =
+  | 'staminaMaxGrowth'
+  | 'thresholdReduction'
+  | 'pushDistanceBonus'
+  | 'staminaCostGrowthReduction';
+
+export interface MapTemplateConfig {
+  id: string;
+  name: string;
+  rewardType: MapRewardType;
+  rewardPerPush: number;
 }
-export const CHECKPOINTS: CheckpointConfig[] = [
-  { height: 200,  reward: { obolus: 10,  drachma: 0, stater: 0 } },
-  { height: 480,  reward: { obolus: 25,  drachma: 0, stater: 0 } },
-  { height: 880,  reward: { obolus: 50,  drachma: 0, stater: 0 } },
-  { height: 1400, reward: { obolus: 100, drachma: 0, stater: 0 } },
-  { height: 2080, reward: { obolus: 0,   drachma: 1, stater: 0 } },
-  { height: 3000, reward: { obolus: 0,   drachma: 2, stater: 0 } },
-  { height: 4200, reward: { obolus: 0,   drachma: 5, stater: 0 } },
+
+// Placeholder map set: same terrain copied per reward type.
+export const MAP_TEMPLATES: MapTemplateConfig[] = [
+  { id: 'map-1', name: 'Map I',   rewardType: 'staminaMaxGrowth',           rewardPerPush: 0.40 },
+  { id: 'map-2', name: 'Map II',  rewardType: 'thresholdReduction',         rewardPerPush: 0.0014 },
+  { id: 'map-3', name: 'Map III', rewardType: 'pushDistanceBonus',         rewardPerPush: 0.10 },
+  { id: 'map-4', name: 'Map IV',  rewardType: 'staminaCostGrowthReduction', rewardPerPush: 0.0035 },
 ];
 
+// Renderer checkpoint markers disabled for now: rewards are granted per successful push.
+export interface CheckpointConfig {
+  height: number;
+}
+export const CHECKPOINTS: CheckpointConfig[] = [];
 export interface MilestoneConfig {
   height: number;
   ingotReward: number;
@@ -79,6 +96,7 @@ export const CAMERA_VIEWPORT_Y = 0.75;
 
 // --- Visual / Mountain ---
 export const MOUNTAIN_SLOPE_ANGLE = 30;            // degrees
+export const START_PLATFORM_LENGTH = 140;          // world units of flat start platform
 // Vibrant Mythos Palette
 export const BACKGROUND_COLOR_TOP = '#2962FF';     // Royal Blue (high altitude)
 export const BACKGROUND_COLOR_BOTTOM = '#4FC3F7';  // Light Blue (low altitude)
@@ -199,3 +217,4 @@ export const UPGRADES: Record<string, UpgradeConfig> = {
     prerequisite: 'pushDistance:3',
   },
 };
+

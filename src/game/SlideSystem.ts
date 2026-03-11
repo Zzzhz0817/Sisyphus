@@ -67,17 +67,6 @@ export class SlideSystem {
     return 0;
   }
 
-  /**
-   * Force an immediate max-speed slide (called when stamina is fully depleted).
-   * Sets slideTime = SLIDE_DURATION so lerp(t=1) = SLIDE_MAX_SPEED from the first frame.
-   */
-  forceMaxSlide(): void {
-    if (this.state === 'sliding') return;
-    this.hasAttempted = true;
-    this.state = 'sliding';
-    this.slideTime = SLIDE_DURATION; // skip ramp-up
-  }
-
   /** Reset for new run */
   reset(): void {
     this.state = 'normal';

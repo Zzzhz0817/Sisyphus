@@ -1,75 +1,63 @@
 import {
-  JUDGMENT_BAR_TOTAL_WIDTH,
-  JUDGMENT_POINTER_SPEED,
+  JUDGMENT_HOLD_SUCCESS_TIME,
+  JUDGMENT_HOLD_BAR_MULTIPLIER,
 } from '../config';
+
+const BASE_HOLD_RANGE = JUDGMENT_HOLD_SUCCESS_TIME * JUDGMENT_HOLD_BAR_MULTIPLIER;
 
 export type JudgmentResult = 'success' | 'fail';
 
 export class JudgmentBar {
-  /** Pointer position 0..1 across the bar */
+  /** Pointer position 0..1 across the current effective bar length */
   pointerPosition = 0;
-  /** Direction: 1 = moving right, -1 = moving left */
-  private direction = 1;
-  /** Whether the bar is currently active (visible, pointer moving) */
+  /** Threshold line ratio in full-bar space (0..1+, based on default 3x width) */
+  thresholdRatio = 1 / JUDGMENT_HOLD_BAR_MULTIPLIER;
+  /** Whether the bar is currently active (visible, timing in progress) */
   active = false;
-  /**
-   * Normalized offset (0..1) of the success zone's left edge within the
-   * available space: left_px = successZoneOffsetRatio * (barWidth - successZoneWidth)
-   * Randomized each time start() is called.
-   */
-  successZoneOffsetRatio = 0.5;
+  /** Seconds held in the current judgment attempt */
+  holdElapsed = 0;
+  /** Current hold range in seconds (bar represents 0..holdRange) */
+  holdRange = BASE_HOLD_RANGE;
+  /** Effective visual bar ratio vs full default 3x range (0..1) */
+  barRatio = 1;
+  /** Current required hold threshold (x) */
+  successThresholdTime = JUDGMENT_HOLD_SUCCESS_TIME;
 
-  /**
-   * Start the judgment bar (mouse down).
-   * @param successZoneWidth Current success zone width in px — used to enforce the
-   *   1/3 constraint: the zone's right edge must extend past the bar's 1/3 mark,
-   *   so even a very narrow zone is never entirely hidden in the leftmost section.
-   */
-  start(successZoneWidth: number): void {
+  /** Start the judgment timer (mouse down). */
+  start(holdRange: number, successThresholdTime: number): void {
     this.pointerPosition = 0;
-    this.direction = 1;
     this.active = true;
+    this.holdElapsed = 0;
+    this.holdRange = Math.max(0, holdRange);
+    this.successThresholdTime = Math.max(0, successThresholdTime);
 
-    // Constraint: zoneLeft + zoneWidth > barWidth/3
-    //  => offsetRatio * availableSpace > barWidth/3 - zoneWidth
-    //  => offsetRatio > (barWidth/3 - zoneWidth) / availableSpace
-    const barWidth = JUDGMENT_BAR_TOTAL_WIDTH;
-    const availableSpace = Math.max(1, barWidth - successZoneWidth);
-    const minOffsetRatio = Math.max(0, (barWidth / 3 - successZoneWidth) / availableSpace);
+    this.barRatio = BASE_HOLD_RANGE > 0
+      ? Math.max(0, Math.min(1, this.holdRange / BASE_HOLD_RANGE))
+      : 0;
 
-    this.successZoneOffsetRatio = minOffsetRatio + Math.random() * (1 - minOffsetRatio);
+    this.thresholdRatio = BASE_HOLD_RANGE > 0
+      ? Math.max(0, this.successThresholdTime / BASE_HOLD_RANGE)
+      : 0;
   }
 
-  /** Update pointer position each frame */
+  /** Update hold timer each frame */
   update(dt: number): void {
     if (!this.active) return;
 
-    const speed = JUDGMENT_POINTER_SPEED / JUDGMENT_BAR_TOTAL_WIDTH; // normalized speed
-    this.pointerPosition += speed * dt * this.direction;
-
-    // Bounce at edges
-    if (this.pointerPosition >= 1) {
+    this.holdElapsed += dt;
+    if (this.holdRange <= 0) {
       this.pointerPosition = 1;
-      this.direction = -1;
-    } else if (this.pointerPosition <= 0) {
-      this.pointerPosition = 0;
-      this.direction = 1;
+      return;
     }
+
+    this.pointerPosition = Math.min(1, this.holdElapsed / this.holdRange);
   }
 
-  /** Stop the bar and judge the result (mouse up) */
-  judge(successZoneWidth: number): JudgmentResult {
+  /** Stop timing and judge by hold duration (mouse up) */
+  judge(): JudgmentResult {
     this.active = false;
 
-    if (successZoneWidth <= 0) return 'fail';
-
-    const barWidth = JUDGMENT_BAR_TOTAL_WIDTH;
-    const availableSpace = barWidth - successZoneWidth;
-    const successStart = this.successZoneOffsetRatio * availableSpace;
-    const successEnd = successStart + successZoneWidth;
-
-    const pointerPx = this.pointerPosition * barWidth;
-
-    return (pointerPx >= successStart && pointerPx <= successEnd) ? 'success' : 'fail';
+    if (this.holdRange < this.successThresholdTime) return 'fail';
+    return this.holdElapsed >= this.successThresholdTime ? 'success' : 'fail';
   }
 }

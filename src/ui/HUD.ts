@@ -7,6 +7,7 @@ export class HUD {
   private ingotEl: HTMLElement;
   private heightEl: HTMLElement;
   private notificationEl: HTMLElement;
+  private devBuffEl: HTMLElement;
   private notificationVisible = false;
 
   constructor() {
@@ -16,6 +17,7 @@ export class HUD {
     this.ingotEl = document.getElementById('hud-ingot')!;
     this.heightEl = document.getElementById('hud-height')!;
     this.notificationEl = document.getElementById('checkpoint-notification')!;
+    this.devBuffEl = document.getElementById('dev-buffs')!;
   }
 
   update(persistent: PersistentState, currentHeight: number): void {
@@ -24,10 +26,19 @@ export class HUD {
     this.staterEl.textContent = String(persistent.stater);
     this.ingotEl.textContent = String(persistent.ingot);
     this.heightEl.textContent = `${Math.floor(currentHeight)}m`;
+
+    const buffs = persistent.mapRewards;
+    this.devBuffEl.innerHTML = [
+      '<div class="dev-buff-title">DEV BUFFS</div>',
+      `<div>+ Max Stamina: ${buffs.staminaMaxGrowth.toFixed(0)}</div>`,
+      `<div>- Hold Threshold: ${buffs.thresholdReduction.toFixed(2)}s</div>`,
+      `<div>+ Push Distance: ${buffs.pushDistanceBonus.toFixed(0)}</div>`,
+      `<div>- Cost Growth: ${buffs.staminaCostGrowthReduction.toFixed(2)}/push</div>`,
+    ].join('');
   }
 
   showNotification(text: string): void {
-    if (this.notificationVisible) return; // already showing, don't re-trigger
+    if (this.notificationVisible) return;
     this.notificationVisible = true;
     this.notificationEl.textContent = text;
     this.notificationEl.classList.add('show');

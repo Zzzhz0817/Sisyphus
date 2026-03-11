@@ -7,6 +7,7 @@ import {
   CLOUD_COLOR,
   CHECKPOINT_VISUAL_RADIUS,
   CHECKPOINTS,
+  START_PLATFORM_LENGTH,
 } from '../config';
 import { degToRad, heightToSlopePosition } from '../utils/helpers';
 import { Camera } from './Camera';
@@ -71,6 +72,9 @@ export class MountainRenderer {
 
     // 5. Draw Main Foreground Mountain
     this.drawMountain(ctx, camera, canvasWidth, canvasHeight);
+
+    // 5.5 Draw flat start platform (spawn + fall destination)
+    this.drawStartPlatform(ctx, camera, canvasWidth, canvasHeight);
 
     // 6. Draw Checkpoints
     this.drawCheckpoints(ctx, camera, canvasWidth, canvasHeight, collectedCheckpoints, time);
@@ -294,6 +298,43 @@ export class MountainRenderer {
     ctx.stroke();
   }
 
+
+  private drawStartPlatform(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    canvasWidth: number,
+    canvasHeight: number,
+  ): void {
+    const startX = -40;
+    const endX = START_PLATFORM_LENGTH + 80;
+    const topY = 0;
+    const thickness = 34;
+
+    const p1 = camera.worldToScreen(startX, topY, canvasWidth, canvasHeight);
+    const p2 = camera.worldToScreen(endX, topY, canvasWidth, canvasHeight);
+    const p3 = camera.worldToScreen(endX, topY + thickness, canvasWidth, canvasHeight);
+    const p4 = camera.worldToScreen(startX, topY + thickness, canvasWidth, canvasHeight);
+
+    const grad = ctx.createLinearGradient(p1.sx, p1.sy, p4.sx, p4.sy);
+    grad.addColorStop(0, '#6D4C41');
+    grad.addColorStop(1, '#3E2723');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(p1.sx, p1.sy);
+    ctx.lineTo(p2.sx, p2.sy);
+    ctx.lineTo(p3.sx, p3.sy);
+    ctx.lineTo(p4.sx, p4.sy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = '#B2FF59';
+    ctx.lineWidth = 4 * camera.zoom;
+    ctx.beginPath();
+    ctx.moveTo(p1.sx, p1.sy);
+    ctx.lineTo(p2.sx, p2.sy);
+    ctx.stroke();
+  }
   private drawCheckpoints(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
@@ -304,7 +345,7 @@ export class MountainRenderer {
   ): void {
     for (let i = 0; i < CHECKPOINTS.length; i++) {
       const cp = CHECKPOINTS[i];
-      const pos = heightToSlopePosition(cp.height, this.slopeAngleRad);
+      const pos = this.getWorldPosition(cp.height);
       const screen = camera.worldToScreen(pos.x, pos.y, canvasWidth, canvasHeight);
       const r = CHECKPOINT_VISUAL_RADIUS * camera.zoom;
       const collected = collectedCheckpoints.includes(i);
@@ -382,8 +423,16 @@ export class MountainRenderer {
     }
   }
 
-  /** Get world position for a given height along the slope */
+  /** Get world position for a given height along terrain (flat start + slope). */
   getWorldPosition(height: number): { x: number; y: number } {
-    return heightToSlopePosition(height, this.slopeAngleRad);
+    if (height <= START_PLATFORM_LENGTH) {
+      return { x: height, y: 0 };
+    }
+
+    const slopePos = heightToSlopePosition(height - START_PLATFORM_LENGTH, this.slopeAngleRad);
+    return {
+      x: START_PLATFORM_LENGTH + slopePos.x,
+      y: slopePos.y,
+    };
   }
 }

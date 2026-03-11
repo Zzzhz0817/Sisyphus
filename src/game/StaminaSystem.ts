@@ -5,6 +5,7 @@ import { clamp } from '../utils/helpers';
 export class StaminaSystem {
   current: number;
   private stats: EffectiveStats;
+  private successCountThisRun = 0;
 
   constructor(stats: EffectiveStats) {
     this.stats = stats;
@@ -13,7 +14,10 @@ export class StaminaSystem {
 
   /** Called when a successful judgment occurs */
   consumeOnSuccess(): void {
-    this.current = Math.max(0, this.current - this.stats.staminaCost);
+    const dynamicCost = this.stats.staminaCost + this.successCountThisRun * this.stats.staminaCostGrowthPerPush;
+    const actualCost = Math.min(dynamicCost, this.stats.staminaCostMaxPerPush);
+    this.current = Math.max(0, this.current - actualCost);
+    this.successCountThisRun++;
   }
 
   /** Called every frame to regenerate stamina */
@@ -37,14 +41,16 @@ export class StaminaSystem {
     return this.current / this.stats.staminaMax;
   }
 
-  /** Update stats (when upgrades change between runs) */
+  /** Update stats (when upgrades/rewards change) */
   updateStats(stats: EffectiveStats): void {
     this.stats = stats;
+    this.current = clamp(this.current, 0, this.stats.staminaMax);
   }
 
   /** Reset to full */
   reset(stats: EffectiveStats): void {
     this.stats = stats;
     this.current = stats.staminaMax;
+    this.successCountThisRun = 0;
   }
 }
