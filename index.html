@@ -110,16 +110,39 @@
       gap: 5px;
     }
 
-    #hud-height {
-      font-family: var(--font-title);
-      font-size: 24px;
-      color: var(--primary-gold);
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    #hud-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      width: 300px;
+      pointer-events: none;
     }
 
-    #hud-best {
+    .hud-metric {
+      background: rgba(0, 0, 0, 0.34);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 10px;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+
+    .hud-metric-label {
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      color: #9fb0c2;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .hud-metric-value {
+      font-family: var(--font-title);
       font-size: 14px;
-      color: #aaa;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.1;
     }
 
     /* --- Judgment Bar --- */
@@ -147,15 +170,6 @@
       position: absolute;
       background: var(--fail-red);
       opacity: 0.3;
-    }
-
-    #judgment-bar-success {
-      position: absolute;
-      top: 0;
-      height: 100%;
-      background: var(--success-green);
-      box-shadow: 0 0 15px var(--success-green);
-      z-index: 2;
     }
 
     #judgment-bar-crit {
@@ -659,7 +673,24 @@
         <div class="currency-display"><div class="currency-icon ingot"></div> <span id="hud-ingot">0</span></div>
       </div>
       <div id="hud-right">
-        <span id="hud-height">0m</span>
+        <div id="hud-metrics">
+          <div class="hud-metric">
+            <span class="hud-metric-label">Current Height</span>
+            <span id="hud-height" class="hud-metric-value">0m</span>
+          </div>
+          <div class="hud-metric">
+            <span class="hud-metric-label">Max Height</span>
+            <span id="hud-max-height" class="hud-metric-value">0m</span>
+          </div>
+          <div class="hud-metric">
+            <span class="hud-metric-label">Longest Distance</span>
+            <span id="hud-longest-distance" class="hud-metric-value">0m</span>
+          </div>
+          <div class="hud-metric">
+            <span class="hud-metric-label">Current Distance</span>
+            <span id="hud-current-distance" class="hud-metric-value">0m</span>
+          </div>
+        </div>
         <div id="dev-buffs"></div>
       </div>
     </div>
@@ -668,7 +699,6 @@
     <div id="judgment-bar-container">
       <div id="judgment-bar">
         <div id="judgment-bar-fail-bg"></div>
-        <div id="judgment-bar-success"></div>
         <div id="judgment-bar-crit"></div>
         <div id="judgment-bar-crit2"></div>
         <div id="judgment-bar-pointer"></div>
@@ -735,4 +765,3 @@
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
-

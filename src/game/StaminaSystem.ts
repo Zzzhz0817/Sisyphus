@@ -13,8 +13,9 @@ export class StaminaSystem {
   }
 
   /** Called when a successful judgment occurs */
-  consumeOnSuccess(): void {
-    const dynamicCost = this.stats.staminaCost + this.successCountThisRun * this.stats.staminaCostGrowthPerPush;
+  consumeOnSuccess(slopeWeight = 1): void {
+    const safeWeight = Math.max(0.2, slopeWeight);
+    const dynamicCost = (this.stats.staminaCost + this.successCountThisRun * this.stats.staminaCostGrowthPerPush) * safeWeight;
     const actualCost = Math.min(dynamicCost, this.stats.staminaCostMaxPerPush);
     this.current = Math.max(0, this.current - actualCost);
     this.successCountThisRun++;

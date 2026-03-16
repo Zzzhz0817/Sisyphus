@@ -13,6 +13,7 @@ export type SlideVisualState = 'normal' | 'sweating' | 'sliding';
 
 export class CharacterRenderer {
   private slopeAngleRad: number;
+  private visualSlopeAngleRad = 0;
 
   constructor() {
     this.slopeAngleRad = degToRad(MOUNTAIN_SLOPE_ANGLE);
@@ -27,15 +28,19 @@ export class CharacterRenderer {
     canvasHeight: number,
     slideState: SlideVisualState,
     time: number,
+    terrainSlopeAngleRad: number,
   ): void {
     const screen = camera.worldToScreen(worldX, worldY, canvasWidth, canvasHeight);
     const scale = camera.zoom;
+    const targetSlope = Number.isFinite(terrainSlopeAngleRad) ? terrainSlopeAngleRad : this.slopeAngleRad;
+    this.visualSlopeAngleRad += (targetSlope - this.visualSlopeAngleRad) * 0.25;
+    const slopeAngleRad = this.visualSlopeAngleRad;
 
     ctx.save();
     ctx.translate(screen.sx, screen.sy);
 
     // Rotate to align with slope
-    ctx.rotate(-this.slopeAngleRad);
+    ctx.rotate(-slopeAngleRad);
 
     const charH = CHARACTER_HEIGHT * scale;
     const boulderR = BOULDER_RADIUS * scale;
@@ -227,12 +232,14 @@ export class CharacterRenderer {
     worldY: number,
     canvasWidth: number,
     canvasHeight: number,
+    terrainSlopeAngleRad: number,
   ): { sx: number; sy: number } {
     const screen = camera.worldToScreen(worldX, worldY, canvasWidth, canvasHeight);
     const charH = CHARACTER_HEIGHT * camera.zoom;
+    const slopeAngleRad = Number.isFinite(terrainSlopeAngleRad) ? terrainSlopeAngleRad : this.slopeAngleRad;
     return {
-      sx: screen.sx - Math.sin(this.slopeAngleRad) * charH * 0.9,
-      sy: screen.sy - Math.cos(this.slopeAngleRad) * charH * 0.9,
+      sx: screen.sx - Math.sin(slopeAngleRad) * charH * 0.9,
+      sy: screen.sy - Math.cos(slopeAngleRad) * charH * 0.9,
     };
   }
 }

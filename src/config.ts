@@ -19,7 +19,7 @@ export const JUDGMENT_BAR_Y_OFFSET = -50;          // px above character head
 export const STAMINA_MAX_BASE = 100;
 export const STAMINA_COST_PER_SUCCESS = 10;
 export const STAMINA_REGEN_RATE_BASE = 0.25;       // points/s
-export const STAMINA_COST_MAX_PER_SUCCESS_BASE = 9; // cap per-push stamina cost (lowered)
+export const STAMINA_COST_MAX_PER_SUCCESS_BASE = 4.5; // cap per-push stamina cost (halved)
 export const STAMINA_COST_GROWTH_PER_PUSH_BASE = 0.5; // extra stamina cost added after each success in a run
 export const SUCCESS_ZONE_MAX_RATIO = 0.6;
 export const SUCCESS_ZONE_MIN_WIDTH = 5;           // px
@@ -97,6 +97,21 @@ export const CAMERA_VIEWPORT_Y = 0.75;
 // --- Visual / Mountain ---
 export const MOUNTAIN_SLOPE_ANGLE = 30;            // degrees
 export const START_PLATFORM_LENGTH = 140;          // world units of flat start platform
+export interface TerrainSlopeSegmentConfig {
+  length: number;  // world units along X
+  slopeDeg: number;
+}
+export const TERRAIN_SLOPE_SEGMENTS: TerrainSlopeSegmentConfig[] = [
+  { length: 180, slopeDeg: 18 },
+  { length: 220, slopeDeg: 30 },
+  { length: 260, slopeDeg: 24 },
+  { length: 200, slopeDeg: 36 },
+  { length: 240, slopeDeg: 28 },
+];
+export const TERRAIN_WEIGHT_BASE_SLOPE_DEG = 30;
+export const TERRAIN_WEIGHT_EXPONENT = 1.0;
+export const TERRAIN_WEIGHT_MIN = 0.7;
+export const TERRAIN_WEIGHT_MAX = 1.6;
 // Vibrant Mythos Palette
 export const BACKGROUND_COLOR_TOP = '#2962FF';     // Royal Blue (high altitude)
 export const BACKGROUND_COLOR_BOTTOM = '#4FC3F7';  // Light Blue (low altitude)
@@ -217,4 +232,3 @@ export const UPGRADES: Record<string, UpgradeConfig> = {
     prerequisite: 'pushDistance:3',
   },
 };
-

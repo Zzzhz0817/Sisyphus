@@ -127,6 +127,12 @@ export class GameManager {
     return JUDGMENT_HOLD_SUCCESS_TIME * JUDGMENT_HOLD_BAR_MULTIPLIER * this.staminaSystem.getRatio();
   }
 
+  /** Displayed height is terrain altitude (0 on flat platform, then rises on slopes). */
+  private getDisplayHeightFromProgress(progressHeight: number): number {
+    const worldPos = this.renderer.mountain.getWorldPosition(progressHeight);
+    return Math.max(0, -worldPos.y);
+  }
+
   private setupInput(): void {
     const canvas = this.renderer.canvas;
 
@@ -139,7 +145,11 @@ export class GameManager {
 
       this.mouseDown = true;
       this.activeMouseButton = e.button as 0 | 2;
-      this.judgmentBar.start(this.getCurrentHoldRange(), this.stats.holdSuccessTime);
+      this.judgmentBar.start(
+        this.getCurrentHoldRange(),
+        this.stats.holdSuccessTime,
+        this.staminaSystem.getSuccessZoneWidth(),
+      );
 
       const headPos = this.renderer.getCharacterHeadScreen(this.run.visualHeight);
       this.judgmentBarUI.show(headPos.sx, headPos.sy);
@@ -162,23 +172,29 @@ export class GameManager {
 
       if (result === 'success') {
         this.run.pushSuccess++;
+        const slopeWeight = this.renderer.mountain.getSlopeWeightAtHeight(this.run.logicalHeight);
+        const weightedPushDistance = this.stats.pushDistance / slopeWeight;
 
-        this.run.logicalHeight += this.stats.pushDistance;
-        if (this.run.logicalHeight > this.run.peakHeight) {
-          this.run.peakHeight = this.run.logicalHeight;
+        this.run.logicalHeight += weightedPushDistance;
+        const displayHeight = this.getDisplayHeightFromProgress(this.run.logicalHeight);
+        if (displayHeight > this.run.peakHeight) {
+          this.run.peakHeight = displayHeight;
+        }
+        if (this.run.logicalHeight > this.persistent.longestDistanceEver) {
+          this.persistent.longestDistanceEver = this.run.logicalHeight;
         }
 
         this.run.pushAnimFrom = this.run.visualHeight;
         this.run.pushAnimElapsed = 0;
         this.run.isPushAnimating = true;
 
-        this.staminaSystem.consumeOnSuccess();
+        this.staminaSystem.consumeOnSuccess(slopeWeight);
         this.slideSystem.onSuccess();
 
         this.checkpointSystem.applyPushBuff(this.persistent);
 
         this.checkpointSystem.checkProgress(
-          this.run.logicalHeight,
+          displayHeight,
           this.persistent,
           this.run.runEarnings,
         );
@@ -308,7 +324,11 @@ export class GameManager {
 
     this.checkpointSystem.update(dt);
 
-    this.hud.update(this.persistent, this.run.visualHeight);
+    this.hud.update(
+      this.persistent,
+      this.getDisplayHeightFromProgress(this.run.visualHeight),
+      this.run.visualHeight,
+    );
 
     if (this.checkpointSystem.notification) {
       this.hud.showNotification(this.checkpointSystem.notification);

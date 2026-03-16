@@ -1,7 +1,6 @@
 import {
   JUDGMENT_BAR_TOTAL_WIDTH,
   JUDGMENT_BAR_HEIGHT,
-  JUDGMENT_SUCCESS_COLOR,
   JUDGMENT_FAIL_COLOR,
   JUDGMENT_POINTER_COLOR,
   JUDGMENT_BAR_Y_OFFSET,
@@ -11,7 +10,6 @@ export class JudgmentBarUI {
   private container: HTMLElement;
   private bar: HTMLElement;
   private failBg: HTMLElement;
-  private successZone: HTMLElement;
   private pointer: HTMLElement;
   private thresholdLine: HTMLElement;
 
@@ -19,7 +17,6 @@ export class JudgmentBarUI {
     this.container = document.getElementById('judgment-bar-container')!;
     this.bar = document.getElementById('judgment-bar')!;
     this.failBg = document.getElementById('judgment-bar-fail-bg')!;
-    this.successZone = document.getElementById('judgment-bar-success')!;
     this.pointer = document.getElementById('judgment-bar-pointer')!;
     this.thresholdLine = document.getElementById('judgment-bar-crit')!;
 
@@ -28,7 +25,6 @@ export class JudgmentBarUI {
     this.bar.style.overflow = 'visible';
 
     this.failBg.style.backgroundColor = JUDGMENT_FAIL_COLOR;
-    this.successZone.style.backgroundColor = JUDGMENT_SUCCESS_COLOR;
     this.pointer.style.backgroundColor = JUDGMENT_POINTER_COLOR;
 
     this.thresholdLine.style.display = 'block';
@@ -54,7 +50,11 @@ export class JudgmentBarUI {
    * @param barRatio Effective bar length ratio vs full 3x bar (0..1)
    * @param thresholdRatio Threshold ratio in full-bar space
    */
-  update(pointerPosition: number, barRatio: number, thresholdRatio: number): void {
+  update(
+    pointerPosition: number,
+    barRatio: number,
+    thresholdRatio: number,
+  ): void {
     const progress = Math.max(0, Math.min(1, pointerPosition));
     const ratio = Math.max(0, Math.min(1, barRatio));
 
@@ -62,8 +62,6 @@ export class JudgmentBarUI {
     this.bar.style.width = `${activeWidth}px`;
 
     this.failBg.style.width = '100%';
-    this.successZone.style.left = '0px';
-    this.successZone.style.width = (progress * activeWidth) + 'px';
 
     const pointerPx = progress * activeWidth;
     this.pointer.style.left = pointerPx + 'px';

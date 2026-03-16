@@ -8,8 +8,13 @@ import {
   CHECKPOINT_VISUAL_RADIUS,
   CHECKPOINTS,
   START_PLATFORM_LENGTH,
+  TERRAIN_SLOPE_SEGMENTS,
+  TERRAIN_WEIGHT_BASE_SLOPE_DEG,
+  TERRAIN_WEIGHT_EXPONENT,
+  TERRAIN_WEIGHT_MIN,
+  TERRAIN_WEIGHT_MAX,
 } from '../config';
-import { degToRad, heightToSlopePosition } from '../utils/helpers';
+import { degToRad } from '../utils/helpers';
 import { Camera } from './Camera';
 
 export class MountainRenderer {
@@ -73,7 +78,7 @@ export class MountainRenderer {
     // 5. Draw Main Foreground Mountain
     this.drawMountain(ctx, camera, canvasWidth, canvasHeight);
 
-    // 5.5 Draw flat start platform (spawn + fall destination)
+    // 5.5 Draw flat start platform
     this.drawStartPlatform(ctx, camera, canvasWidth, canvasHeight);
 
     // 6. Draw Checkpoints
@@ -215,27 +220,32 @@ export class MountainRenderer {
   ): void {
     // Reduced buffer from 4000 to 1000 to avoid extreme coordinate culling on some hardware.
     // 1000 world units * 3 zoom = 3000 px, which is plenty to cover the screen bounds.
-    const buffer = 1000; 
+    const buffer = 1000;
     const visibleWorldHeight = canvasHeight / camera.zoom;
     const visibleWorldWidth = canvasWidth / camera.zoom;
-    
+
     const worldLeft = camera.x - visibleWorldWidth / 2 - buffer;
     const worldRight = camera.x + visibleWorldWidth / 2 + buffer;
-    
-    // Compute Y along the slope surface: y = -x * tan(angle)
-    const tanAngle = Math.tan(this.slopeAngleRad);
-    const leftSurfaceY = -worldLeft * tanAngle;
-    const rightSurfaceY = -worldRight * tanAngle;
 
-    // Project the 4 corners of our mountain polygon into screen space
-    const surfaceLeft = camera.worldToScreen(worldLeft, leftSurfaceY, canvasWidth, canvasHeight);
-    const surfaceRight = camera.worldToScreen(worldRight, rightSurfaceY, canvasWidth, canvasHeight);
-    
+    const sampleStep = Math.max(12, Math.round(28 / Math.max(camera.zoom, 0.001)));
+    const sampleXs = this.getSurfaceSampleXs(worldLeft, worldRight, sampleStep);
+    const topWorldPoints = sampleXs.map((x) => ({ x, y: this.getTerrainY(x) }));
+    const topScreenPoints = topWorldPoints.map((p) =>
+      camera.worldToScreen(p.x, p.y, canvasWidth, canvasHeight),
+    );
+    const surfaceLeft = topScreenPoints[0];
+    const surfaceRight = topScreenPoints[topScreenPoints.length - 1];
+
     // Project the bottom corners. We use a generous depth (e.g. visibleWorldHeight * 2 + buffer)
     // to ensure the mountain fills the bottom of the screen.
     const depth = visibleWorldHeight * 2 + buffer;
-    const pBotLeft = camera.worldToScreen(worldLeft, leftSurfaceY + depth, canvasWidth, canvasHeight);
-    const pBotRight = camera.worldToScreen(worldRight, rightSurfaceY + depth, canvasWidth, canvasHeight);
+    const pBotLeft = camera.worldToScreen(worldLeft, topWorldPoints[0].y + depth, canvasWidth, canvasHeight);
+    const pBotRight = camera.worldToScreen(
+      worldRight,
+      topWorldPoints[topWorldPoints.length - 1].y + depth,
+      canvasWidth,
+      canvasHeight,
+    );
 
     // --- Draw Soil (Base) ---
     // Make the soil look more earthy by using a linear gradient down into the earth
@@ -246,7 +256,9 @@ export class MountainRenderer {
     ctx.fillStyle = soilGradient;
     ctx.beginPath();
     ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy);
+    for (let i = 1; i < topScreenPoints.length; i++) {
+      ctx.lineTo(topScreenPoints[i].sx, topScreenPoints[i].sy);
+    }
     ctx.lineTo(pBotRight.sx, pBotRight.sy);
     ctx.lineTo(pBotLeft.sx, pBotLeft.sy);
     ctx.closePath();
@@ -269,32 +281,35 @@ export class MountainRenderer {
 
     // --- Draw Grass (Top Layer) ---
     const grassThickness = 28 * camera.zoom;
-    const xOff = grassThickness * Math.sin(this.slopeAngleRad);
-    const yOff = grassThickness * Math.cos(this.slopeAngleRad);
-
-    ctx.fillStyle = MOUNTAIN_GRASS_COLOR;
+    ctx.strokeStyle = MOUNTAIN_GRASS_COLOR;
+    ctx.lineWidth = grassThickness;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy);
-    ctx.lineTo(surfaceRight.sx + xOff, surfaceRight.sy + yOff);
-    ctx.lineTo(surfaceLeft.sx + xOff, surfaceLeft.sy + yOff);
-    ctx.closePath();
-    ctx.fill();
+    for (let i = 1; i < topScreenPoints.length; i++) {
+      ctx.lineTo(topScreenPoints[i].sx, topScreenPoints[i].sy);
+    }
+    ctx.stroke();
     
     // Lighter top edge (Grass Highlight)
     ctx.strokeStyle = '#B2FF59'; 
     ctx.lineWidth = 6 * camera.zoom;
     ctx.beginPath();
     ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy);
+    for (let i = 1; i < topScreenPoints.length; i++) {
+      ctx.lineTo(topScreenPoints[i].sx, topScreenPoints[i].sy);
+    }
     ctx.stroke();
     
     // Inner grass shadow line
     ctx.strokeStyle = 'rgba(51, 105, 30, 0.4)'; 
     ctx.lineWidth = 4 * camera.zoom;
     ctx.beginPath();
-    ctx.moveTo(surfaceLeft.sx + xOff, surfaceLeft.sy + yOff);
-    ctx.lineTo(surfaceRight.sx + xOff, surfaceRight.sy + yOff);
+    ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy + grassThickness * 0.35);
+    for (let i = 1; i < topScreenPoints.length; i++) {
+      ctx.lineTo(topScreenPoints[i].sx, topScreenPoints[i].sy + grassThickness * 0.35);
+    }
     ctx.stroke();
   }
 
@@ -306,7 +321,7 @@ export class MountainRenderer {
     canvasHeight: number,
   ): void {
     const startX = -40;
-    const endX = START_PLATFORM_LENGTH + 80;
+    const endX = START_PLATFORM_LENGTH;
     const topY = 0;
     const thickness = 34;
 
@@ -423,16 +438,112 @@ export class MountainRenderer {
     }
   }
 
+  private getSurfaceSampleXs(worldLeft: number, worldRight: number, sampleStep: number): number[] {
+    const xs: number[] = [];
+    for (let x = worldLeft; x < worldRight; x += sampleStep) {
+      xs.push(x);
+    }
+    xs.push(worldRight);
+
+    if (worldLeft < START_PLATFORM_LENGTH && worldRight > START_PLATFORM_LENGTH) {
+      xs.push(START_PLATFORM_LENGTH);
+    }
+
+    const segments = TERRAIN_SLOPE_SEGMENTS.length > 0 ? TERRAIN_SLOPE_SEGMENTS : [{ length: 1, slopeDeg: MOUNTAIN_SLOPE_ANGLE }];
+    let boundaryX = START_PLATFORM_LENGTH;
+    let segIndex = 0;
+    while (boundaryX < worldRight) {
+      const segLen = Math.max(1, segments[segIndex % segments.length].length);
+      boundaryX += segLen;
+      if (boundaryX > worldLeft && boundaryX < worldRight) {
+        xs.push(boundaryX);
+      }
+      segIndex++;
+    }
+
+    xs.sort((a, b) => a - b);
+    const deduped: number[] = [];
+    for (const x of xs) {
+      if (deduped.length === 0 || Math.abs(x - deduped[deduped.length - 1]) > 0.001) {
+        deduped.push(x);
+      }
+    }
+    return deduped;
+  }
+
+  private getTerrainY(worldX: number): number {
+    if (worldX <= START_PLATFORM_LENGTH) return 0;
+    const run = worldX - START_PLATFORM_LENGTH;
+    return -this.getTerrainRiseByRun(run);
+  }
+
+  private getTerrainRiseByRun(run: number): number {
+    let remaining = Math.max(0, run);
+    if (remaining <= 0) return 0;
+
+    const segments = TERRAIN_SLOPE_SEGMENTS.length > 0 ? TERRAIN_SLOPE_SEGMENTS : [{ length: 1, slopeDeg: MOUNTAIN_SLOPE_ANGLE }];
+    let rise = 0;
+    let segIndex = 0;
+
+    while (remaining > 0) {
+      const seg = segments[segIndex % segments.length];
+      const segLen = Math.max(1, seg.length);
+      const take = Math.min(segLen, remaining);
+      rise += take * Math.tan(degToRad(seg.slopeDeg));
+      remaining -= take;
+      segIndex++;
+    }
+
+    return rise;
+  }
+
+  private getSlopeDegByRun(run: number): number {
+    if (run <= 0) return 0;
+    const segments = TERRAIN_SLOPE_SEGMENTS.length > 0 ? TERRAIN_SLOPE_SEGMENTS : [{ length: 1, slopeDeg: MOUNTAIN_SLOPE_ANGLE }];
+
+    let remaining = run;
+    let segIndex = 0;
+    while (remaining > 0) {
+      const seg = segments[segIndex % segments.length];
+      const segLen = Math.max(1, seg.length);
+      if (remaining <= segLen) {
+        return seg.slopeDeg;
+      }
+      remaining -= segLen;
+      segIndex++;
+    }
+
+    return segments[0].slopeDeg;
+  }
+
+  getSlopeWeightAtHeight(height: number): number {
+    if (height <= START_PLATFORM_LENGTH) {
+      return TERRAIN_WEIGHT_MIN;
+    }
+
+    const run = height - START_PLATFORM_LENGTH;
+    const slopeDeg = this.getSlopeDegByRun(run);
+    const baseTan = Math.max(0.001, Math.tan(degToRad(TERRAIN_WEIGHT_BASE_SLOPE_DEG)));
+    const currentTan = Math.max(0.001, Math.tan(degToRad(slopeDeg)));
+    const raw = Math.pow(currentTan / baseTan, TERRAIN_WEIGHT_EXPONENT);
+    return Math.max(TERRAIN_WEIGHT_MIN, Math.min(TERRAIN_WEIGHT_MAX, raw));
+  }
+
+  getSlopeRadAtHeight(height: number): number {
+    if (height <= START_PLATFORM_LENGTH) return 0;
+    const run = height - START_PLATFORM_LENGTH;
+    return degToRad(this.getSlopeDegByRun(run));
+  }
+
   /** Get world position for a given height along terrain (flat start + slope). */
   getWorldPosition(height: number): { x: number; y: number } {
     if (height <= START_PLATFORM_LENGTH) {
       return { x: height, y: 0 };
     }
 
-    const slopePos = heightToSlopePosition(height - START_PLATFORM_LENGTH, this.slopeAngleRad);
     return {
-      x: START_PLATFORM_LENGTH + slopePos.x,
-      y: slopePos.y,
+      x: height,
+      y: this.getTerrainY(height),
     };
   }
 }

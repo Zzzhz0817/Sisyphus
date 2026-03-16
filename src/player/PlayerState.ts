@@ -44,6 +44,7 @@ export interface PersistentState {
   /** Per-map total successful pushes used for inverse reward scaling. */
   mapPushCounts: Record<string, number>;
   highestEver: number;
+  longestDistanceEver: number;
   totalRuns: number;
   runHistory: RunRecord[];
 }
@@ -83,6 +84,7 @@ export function createInitialPersistentState(): PersistentState {
     },
     mapPushCounts,
     highestEver: 0,
+    longestDistanceEver: 0,
     totalRuns: 0,
     runHistory: [],
   };
@@ -122,4 +124,3 @@ export function getEffectiveStats(persistent: PersistentState): EffectiveStats {
     holdSuccessTime,
   };
 }
-
