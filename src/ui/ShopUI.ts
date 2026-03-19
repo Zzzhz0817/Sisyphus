@@ -1,4 +1,4 @@
-import { UPGRADES, ARTIFACTS, MAX_EQUIPPED_ARTIFACTS } from '../config';
+import { UPGRADES, ARTIFACTS, MAX_EQUIPPED_ARTIFACTS, MOUNTAINS } from '../config';
 import { PersistentState } from '../player/PlayerState';
 import { canAfford } from '../player/CurrencyManager';
 import { getUpgradeCost, isPrerequisiteMet, purchaseUpgrade } from '../player/UpgradeManager';
@@ -19,18 +19,7 @@ export class ShopUI {
     this.upgradesContainer = document.getElementById('shop-upgrades')!;
     this.artifactsContainer = document.getElementById('shop-artifacts')!;
     this.artifactSection = document.getElementById('shop-artifact-section')!;
-    // Note: shop-currency-bar is no longer in the new HTML, we might remove it or repurpose
-    // But let's check index.html again. Ah, I removed shop-currency-bar in the new HTML.
-    // I should probably remove it here too or add it back if needed.
-    // The new HTML has HUD visible behind? No, shop overlay covers everything.
-    // Wait, the new HTML shop content has:
-    // <div id="shop-stats"></div>
-    // <div class="shop-section">...</div>
-    // It does NOT have shop-currency-bar.
-    // I should add a currency display to the shop or rely on the HUD if it's visible (but overlay background is opaque-ish).
-    // Let's add a currency display to the shop header or stats area.
-    
-    this.currencyBar = document.createElement('div'); // Dummy for now to avoid null check errors if I don't fully refactor
+    this.currencyBar = document.createElement('div');
     this.statsEl = document.getElementById('shop-stats')!;
     this.departBtn = document.getElementById('shop-depart-btn')!;
 
@@ -61,14 +50,13 @@ export class ShopUI {
 
     // Upgrades
     this.upgradesContainer.innerHTML = '';
-    
-    // Sort upgrades: unlocked first, then locked
+
     const upgradeKeys = Object.keys(UPGRADES).sort((a, b) => {
-        const aMet = isPrerequisiteMet(a, state);
-        const bMet = isPrerequisiteMet(b, state);
-        if (aMet && !bMet) return -1;
-        if (!aMet && bMet) return 1;
-        return 0;
+      const aMet = isPrerequisiteMet(a, state);
+      const bMet = isPrerequisiteMet(b, state);
+      if (aMet && !bMet) return -1;
+      if (!aMet && bMet) return 1;
+      return 0;
     });
 
     for (const id of upgradeKeys) {
@@ -97,15 +85,15 @@ export class ShopUI {
       let statusText = '';
       if (maxed) statusText = '<span style="color:#4caf50">MAXED</span>';
       else if (locked) {
-         if (config.prerequisite) {
-            const [pid, plvl] = config.prerequisite.split(':');
-            const pConfig = UPGRADES[pid];
-            statusText = `Requires ${pConfig?.name ?? pid} Lv${plvl}`;
-         } else {
-            statusText = 'Locked';
-         }
+        if (config.prerequisite) {
+          const [pid, plvl] = config.prerequisite.split(':');
+          const pConfig = UPGRADES[pid];
+          statusText = `Requires ${pConfig?.name ?? pid} Lv${plvl}`;
+        } else {
+          statusText = 'Locked';
+        }
       } else {
-          statusText = costText;
+        statusText = costText;
       }
 
       card.innerHTML = `
@@ -129,12 +117,10 @@ export class ShopUI {
     }
 
     // Artifacts
-    // Always show artifact section if we have ingots or any artifacts, or if we want to tease them
-    // For now, keep logic: show if we have ingot or any artifact
     if (state.ingot > 0 || state.craftedArtifacts.length > 0) {
       this.artifactSection.style.display = 'block';
       this.artifactsContainer.innerHTML = '';
-      
+
       for (const artifact of ARTIFACTS) {
         const crafted = state.craftedArtifacts.includes(artifact.id);
         const equipped = state.equippedArtifacts.includes(artifact.id);
@@ -161,19 +147,16 @@ export class ShopUI {
 
         card.addEventListener('click', () => {
           if (!crafted && canCraft) {
-            // Craft
             state.ingot -= artifact.ingotCost;
             state.craftedArtifacts.push(artifact.id);
             this.refresh(state, runEarnings);
           } else if (crafted && !equipped) {
-            // Equip
             if (state.equippedArtifacts.length < MAX_EQUIPPED_ARTIFACTS) {
               state.equippedArtifacts.push(artifact.id);
               this.refresh(state, runEarnings);
             }
           } else if (equipped) {
-            // Unequip
-            state.equippedArtifacts = state.equippedArtifacts.filter(id => id !== artifact.id);
+            state.equippedArtifacts = state.equippedArtifacts.filter((id) => id !== artifact.id);
             this.refresh(state, runEarnings);
           }
         });
@@ -182,6 +165,77 @@ export class ShopUI {
       }
     } else {
       this.artifactSection.style.display = 'none';
+    }
+
+    // Mountain selector
+    this.renderMountainSelector(state, runEarnings);
+  }
+
+  private renderMountainSelector(state: PersistentState, runEarnings: { obolus: number; drachma: number; stater: number; ingot: number }): void {
+    let container = document.getElementById('shop-mountain-selector');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'shop-mountain-selector';
+      // Insert before the depart button
+      this.departBtn.parentElement!.insertBefore(container, this.departBtn);
+    }
+
+    container.innerHTML = `
+      <div style="margin: 20px 0 10px; text-align: center; font-family: 'Cinzel', serif; color: var(--primary-gold, #FFD740); font-size: 16px; letter-spacing: 1px;">
+        Choose Your Mountain
+      </div>
+      <div id="mountain-options" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
+    `;
+
+    const optionsEl = container.querySelector('#mountain-options')!;
+
+    for (let i = 0; i < MOUNTAINS.length; i++) {
+      const m = MOUNTAINS[i];
+      const unlocked = state.mountainsUnlocked[i];
+      const summited = state.mountainsSummited[i];
+      const selected = state.selectedMountainIndex === i;
+
+      const option = document.createElement('div');
+      option.style.cssText = `
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 16px; border-radius: 8px; cursor: ${unlocked ? 'pointer' : 'default'};
+        background: ${selected ? 'rgba(255, 215, 64, 0.15)' : 'rgba(255,255,255,0.05)'};
+        border: 2px solid ${selected ? 'var(--primary-gold, #FFD740)' : 'rgba(255,255,255,0.1)'};
+        opacity: ${unlocked ? '1' : '0.4'};
+        transition: all 0.2s;
+      `;
+
+      const radio = selected ? '&#9679;' : '&#9675;';
+      const lockIcon = unlocked ? '' : ' &#128274;';
+      const summitBadge = summited ? ' <span style="color:#4caf50; font-size:12px;">&#10003; Summited</span>' : '';
+      const multiplierColor = m.pushDistanceMultiplier < 1 ? '#FF5252' : '#4caf50';
+
+      option.innerHTML = `
+        <span style="font-size: 18px; color: var(--primary-gold, #FFD740);">${radio}</span>
+        <div style="flex: 1;">
+          <div style="font-family: 'Cinzel', serif; font-size: 14px; color: #fff;">
+            ${m.name}${lockIcon}${summitBadge}
+          </div>
+          <div style="font-size: 11px; color: rgba(255,255,255,0.6);">
+            Height: ${m.height.toLocaleString()} | Push: <span style="color:${multiplierColor}">&times;${m.pushDistanceMultiplier}</span>
+          </div>
+        </div>
+      `;
+
+      if (unlocked) {
+        option.addEventListener('click', () => {
+          state.selectedMountainIndex = i;
+          this.refresh(state, runEarnings);
+        });
+        option.addEventListener('mouseenter', () => {
+          if (!selected) option.style.background = 'rgba(255, 215, 64, 0.08)';
+        });
+        option.addEventListener('mouseleave', () => {
+          if (!selected) option.style.background = 'rgba(255,255,255,0.05)';
+        });
+      }
+
+      optionsEl.appendChild(option);
     }
   }
 }

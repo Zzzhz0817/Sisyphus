@@ -16,8 +16,16 @@ export const JUDGMENT_BAR_Y_OFFSET = -50;          // px above character head
 export const STAMINA_MAX_BASE = 100;
 export const STAMINA_COST_PER_SUCCESS = 10;
 export const STAMINA_REGEN_RATE_BASE = 0.25;       // points/s
-export const SUCCESS_ZONE_MAX_RATIO = 0.6;
-export const SUCCESS_ZONE_MIN_WIDTH = 5;           // px
+
+// --- Judgment Zone Curve (power-curve model) ---
+// successZoneWidth = floor + range × t^exponent   (t = currentStamina/maxStamina)
+// range = min(baseRange + bonus × (maxStamina - baseMaxStamina), maxRange)
+export const JUDGMENT_FLOOR = 10;                   // px – minimum zone when stamina > 0
+export const JUDGMENT_BASE_RANGE = 70;              // px – base variation (full-stam zone 80 - floor 10)
+export const JUDGMENT_BONUS_PER_STAMINA = 0.55;     // px per maxStamina point above base
+export const JUDGMENT_BASE_MAX_STAMINA = 100;       // baseline for bonus calculation
+export const JUDGMENT_MAX_RANGE = 290;              // px – cap (barWidth - floor)
+export const JUDGMENT_EXPONENT = 2.0;               // >1 → fast drop at high stamina, slow at low
 
 // --- Slide / Failure ---
 export const SWEAT_DELAY = 1.0;                    // s after last success -> sweating
@@ -36,30 +44,104 @@ export interface CheckpointConfig {
   height: number;
   reward: { obolus: number; drachma: number; stater: number };
 }
-export const CHECKPOINTS: CheckpointConfig[] = [
-  { height: 200,  reward: { obolus: 10,  drachma: 0, stater: 0 } },
-  { height: 480,  reward: { obolus: 25,  drachma: 0, stater: 0 } },
-  { height: 880,  reward: { obolus: 50,  drachma: 0, stater: 0 } },
-  { height: 1400, reward: { obolus: 100, drachma: 0, stater: 0 } },
-  { height: 2080, reward: { obolus: 0,   drachma: 1, stater: 0 } },
-  { height: 3000, reward: { obolus: 0,   drachma: 2, stater: 0 } },
-  { height: 4200, reward: { obolus: 0,   drachma: 5, stater: 0 } },
-];
-
-export interface MilestoneConfig {
-  height: number;
-  ingotReward: number;
-}
-export const MILESTONES: MilestoneConfig[] = [
-  { height: 480,  ingotReward: 1 },
-  { height: 1400, ingotReward: 1 },
-  { height: 2080, ingotReward: 2 },
-  { height: 3000, ingotReward: 2 },
-  { height: 4200, ingotReward: 3 },
-];
 
 export const CHECKPOINT_VISUAL_RADIUS = 15;
 export const CHECKPOINT_COLLECT_ANIMATION_DURATION = 0.5; // s
+
+// --- Mountains (Four-Mountain System) ---
+export interface MountainConfig {
+  id: number;
+  name: string;
+  height: number;                  // summit height (game units)
+  slopeAngle: number;             // degrees
+  pushDistanceMultiplier: number; // effective push = base × upgrade × this
+  summitIngotReward: number;      // first-summit-only ingot reward
+  checkpoints: CheckpointConfig[];
+  // Visual theme
+  grassColor: string;
+  soilColor: string;
+  bgColorTop: string;
+  bgColorBottom: string;
+}
+
+export const MOUNTAINS: MountainConfig[] = [
+  {
+    id: 0,
+    name: 'Tartarus Hills',
+    height: 2000,
+    slopeAngle: 25,
+    pushDistanceMultiplier: 1.0,
+    summitIngotReward: 2,
+    checkpoints: [
+      { height: 200,  reward: { obolus: 10,  drachma: 0, stater: 0 } },
+      { height: 480,  reward: { obolus: 25,  drachma: 0, stater: 0 } },
+      { height: 880,  reward: { obolus: 50,  drachma: 0, stater: 0 } },
+      { height: 1400, reward: { obolus: 100, drachma: 0, stater: 0 } },
+      { height: 1800, reward: { obolus: 150, drachma: 0, stater: 0 } },
+    ],
+    grassColor: '#76FF03',
+    soilColor: '#795548',
+    bgColorTop: '#2962FF',
+    bgColorBottom: '#4FC3F7',
+  },
+  {
+    id: 1,
+    name: 'Underworld Slope',
+    height: 5000,
+    slopeAngle: 30,
+    pushDistanceMultiplier: 0.5,
+    summitIngotReward: 3,
+    checkpoints: [
+      { height: 400,  reward: { obolus: 50,  drachma: 0, stater: 0 } },
+      { height: 1000, reward: { obolus: 120, drachma: 0, stater: 0 } },
+      { height: 2000, reward: { obolus: 0,   drachma: 1, stater: 0 } },
+      { height: 3200, reward: { obolus: 0,   drachma: 2, stater: 0 } },
+      { height: 4500, reward: { obolus: 0,   drachma: 4, stater: 0 } },
+    ],
+    grassColor: '#558B2F',
+    soilColor: '#4E342E',
+    bgColorTop: '#1A237E',
+    bgColorBottom: '#303F9F',
+  },
+  {
+    id: 2,
+    name: 'Olympus Foothills',
+    height: 12000,
+    slopeAngle: 35,
+    pushDistanceMultiplier: 0.35,
+    summitIngotReward: 5,
+    checkpoints: [
+      { height: 800,   reward: { obolus: 200, drachma: 0, stater: 0 } },
+      { height: 2500,  reward: { obolus: 0,   drachma: 3, stater: 0 } },
+      { height: 5000,  reward: { obolus: 0,   drachma: 6, stater: 0 } },
+      { height: 8000,  reward: { obolus: 0,   drachma: 0, stater: 1 } },
+      { height: 11000, reward: { obolus: 0,   drachma: 0, stater: 2 } },
+    ],
+    grassColor: '#33691E',
+    soilColor: '#3E2723',
+    bgColorTop: '#311B92',
+    bgColorBottom: '#4527A0',
+  },
+  {
+    id: 3,
+    name: "Summit of the Gods",
+    height: 24000,
+    slopeAngle: 40,
+    pushDistanceMultiplier: 0.25,
+    summitIngotReward: 10,
+    checkpoints: [
+      { height: 2000,  reward: { obolus: 0,   drachma: 5,  stater: 0 } },
+      { height: 6000,  reward: { obolus: 0,   drachma: 0,  stater: 2 } },
+      { height: 12000, reward: { obolus: 0,   drachma: 0,  stater: 5 } },
+      { height: 18000, reward: { obolus: 0,   drachma: 0,  stater: 10 } },
+      { height: 23000, reward: { obolus: 0,   drachma: 0,  stater: 20 } },
+    ],
+    grassColor: '#1B5E20',
+    soilColor: '#212121',
+    bgColorTop: '#0D0D0D',
+    bgColorBottom: '#1A0033',
+  },
+];
 
 // --- Currency ---
 export const OBOLUS_TO_DRACHMA_RATE = 10000;
@@ -189,13 +271,5 @@ export const UPGRADES: Record<string, UpgradeConfig> = {
     baseCost: { obolus: 15, drachma: 0, stater: 0 },
     effectPerLevel: [0.25, 0.35, 0.50, 0.70, 1.0, 1.4, 1.9, 2.5, 3.2, 4.0],
     prerequisite: 'staminaMax:5',
-  },
-  successZoneRatio: {
-    name: 'Keen Instinct',
-    description: 'Widen the success zone at full stamina',
-    maxLevel: 10,
-    baseCost: { obolus: 12, drachma: 0, stater: 0 },
-    effectPerLevel: [0.60, 0.63, 0.66, 0.70, 0.74, 0.78, 0.82, 0.86, 0.90, 0.95],
-    prerequisite: 'pushDistance:3',
   },
 };

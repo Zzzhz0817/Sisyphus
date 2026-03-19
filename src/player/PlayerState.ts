@@ -1,4 +1,4 @@
-import { STAMINA_MAX_BASE, STAMINA_REGEN_RATE_BASE, STAMINA_COST_PER_SUCCESS, SUCCESS_ZONE_MAX_RATIO, PUSH_DISTANCE_BASE, UPGRADES } from '../config';
+import { STAMINA_MAX_BASE, STAMINA_REGEN_RATE_BASE, STAMINA_COST_PER_SUCCESS, PUSH_DISTANCE_BASE, UPGRADES } from '../config';
 
 /** Per-run analytics record */
 export interface RunRecord {
@@ -24,6 +24,10 @@ export interface PersistentState {
   highestEver: number;
   totalRuns: number;
   runHistory: RunRecord[];
+  // Mountain system
+  mountainsUnlocked: boolean[];   // which mountains are accessible
+  mountainsSummited: boolean[];   // which mountains have been summited (for one-time ingot)
+  selectedMountainIndex: number;  // which mountain to climb next
 }
 
 /** Derived stats computed from upgrades */
@@ -32,7 +36,6 @@ export interface EffectiveStats {
   staminaMax: number;
   staminaCost: number;
   staminaRegen: number;
-  successZoneMaxRatio: number;
 }
 
 export function createInitialPersistentState(): PersistentState {
@@ -48,6 +51,9 @@ export function createInitialPersistentState(): PersistentState {
     highestEver: 0,
     totalRuns: 0,
     runHistory: [],
+    mountainsUnlocked: [true, false, false, false],
+    mountainsSummited: [false, false, false, false],
+    selectedMountainIndex: 0,
   };
 }
 
@@ -69,6 +75,5 @@ export function getEffectiveStats(persistent: PersistentState): EffectiveStats {
     staminaMax: getUpgradeEffect('staminaMax', persistent) || STAMINA_MAX_BASE,
     staminaCost: getUpgradeEffect('staminaCostReduction', persistent) || STAMINA_COST_PER_SUCCESS,
     staminaRegen: getUpgradeEffect('staminaRegen', persistent) || STAMINA_REGEN_RATE_BASE,
-    successZoneMaxRatio: getUpgradeEffect('successZoneRatio', persistent) || SUCCESS_ZONE_MAX_RATIO,
   };
 }

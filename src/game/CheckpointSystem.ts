@@ -1,31 +1,37 @@
-import { CHECKPOINTS, MILESTONES, CHECKPOINT_COLLECT_ANIMATION_DURATION } from '../config';
+import { CheckpointConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION } from '../config';
 import { PersistentState } from '../player/PlayerState';
 import { addCurrency } from '../player/CurrencyManager';
-
-export interface CheckpointEvent {
-  index: number;
-  reward: { obolus: number; drachma: number; stater: number };
-}
-
-export interface MilestoneEvent {
-  height: number;
-  ingotReward: number;
-}
 
 export class CheckpointSystem {
   /** Checkpoint indices collected this run */
   collectedThisRun: number[] = [];
 
+  /** The checkpoint list for the current mountain */
+  private checkpoints: CheckpointConfig[] = [];
+
   /** Pending notification text and timer */
   notification: string | null = null;
   notificationTimer = 0;
 
+  /** Set checkpoints for the current mountain */
+  setCheckpoints(checkpoints: CheckpointConfig[]): void {
+    this.checkpoints = checkpoints;
+  }
+
+  /** Get current checkpoint list (for rendering) */
+  getCheckpoints(): CheckpointConfig[] {
+    return this.checkpoints;
+  }
+
   /** Check if any new checkpoints have been passed */
-  checkProgress(currentHeight: number, persistent: PersistentState, runEarnings: { obolus: number; drachma: number; stater: number; ingot: number }): void {
-    // Check regular checkpoints
-    for (let i = 0; i < CHECKPOINTS.length; i++) {
+  checkProgress(
+    currentHeight: number,
+    persistent: PersistentState,
+    runEarnings: { obolus: number; drachma: number; stater: number; ingot: number },
+  ): void {
+    for (let i = 0; i < this.checkpoints.length; i++) {
       if (this.collectedThisRun.includes(i)) continue;
-      const cp = CHECKPOINTS[i];
+      const cp = this.checkpoints[i];
       if (currentHeight >= cp.height) {
         this.collectedThisRun.push(i);
         addCurrency(persistent, cp.reward);
@@ -33,25 +39,12 @@ export class CheckpointSystem {
         runEarnings.drachma += cp.reward.drachma;
         runEarnings.stater += cp.reward.stater;
 
-        // Build notification
         const parts: string[] = [];
         if (cp.reward.obolus > 0) parts.push(`+${cp.reward.obolus} Obolus`);
         if (cp.reward.drachma > 0) parts.push(`+${cp.reward.drachma} Drachma`);
         if (cp.reward.stater > 0) parts.push(`+${cp.reward.stater} Stater`);
         this.notification = parts.join('  ');
         this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
-      }
-    }
-
-    // Check milestones (first-time only)
-    for (const ms of MILESTONES) {
-      if (currentHeight >= ms.height && !persistent.claimedMilestones.includes(ms.height)) {
-        persistent.claimedMilestones.push(ms.height);
-        persistent.ingot += ms.ingotReward;
-        runEarnings.ingot += ms.ingotReward;
-
-        this.notification = `Milestone! +${ms.ingotReward} Ingot`;
-        this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION * 2;
       }
     }
 

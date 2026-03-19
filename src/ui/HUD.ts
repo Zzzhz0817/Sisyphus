@@ -7,6 +7,7 @@ export class HUD {
   private ingotEl: HTMLElement;
   private heightEl: HTMLElement;
   private notificationEl: HTMLElement;
+  private mountainNameEl: HTMLElement | null;
   private notificationVisible = false;
 
   constructor() {
@@ -16,6 +17,13 @@ export class HUD {
     this.ingotEl = document.getElementById('hud-ingot')!;
     this.heightEl = document.getElementById('hud-height')!;
     this.notificationEl = document.getElementById('checkpoint-notification')!;
+    this.mountainNameEl = document.getElementById('hud-mountain-name');
+  }
+
+  setMountainName(name: string): void {
+    if (this.mountainNameEl) {
+      this.mountainNameEl.textContent = name;
+    }
   }
 
   update(persistent: PersistentState, currentHeight: number): void {
@@ -27,7 +35,7 @@ export class HUD {
   }
 
   showNotification(text: string): void {
-    if (this.notificationVisible) return; // already showing, don't re-trigger
+    if (this.notificationVisible) return;
     this.notificationVisible = true;
     this.notificationEl.textContent = text;
     this.notificationEl.classList.add('show');

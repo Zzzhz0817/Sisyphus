@@ -13,30 +13,26 @@ import {
   getEffectiveStats,
   EffectiveStats,
 } from '../player/PlayerState';
-import { PUSH_ANIMATION_DURATION } from '../config';
+import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION } from '../config';
 import { lerp } from '../utils/helpers';
 
 export type GameState = 'climbing' | 'shop';
 
 interface RunState {
-  /** True game-logic height used for checkpoint detection, slide math, etc. */
+  /** True game-logic height relative to current mountain base (0 = base, mountainHeight = summit). */
   logicalHeight: number;
   /** Animated display height for rendering (chases logicalHeight with easing). */
   visualHeight: number;
-  /** The visual height at the moment a push animation started. */
   pushAnimFrom: number;
-  /** Seconds elapsed since the current push animation started. */
   pushAnimElapsed: number;
-  /** Whether a push animation is currently in progress. */
   isPushAnimating: boolean;
   isWedgeActive: boolean;
   runEarnings: { obolus: number; drachma: number; stater: number; ingot: number };
-  /** Peak height reached this run (logicalHeight can drop during slide). */
   peakHeight: number;
-  /** Number of successful judgment presses this run. */
   pushSuccess: number;
-  /** Number of failed judgment presses this run. */
   pushFail: number;
+  /** Index of the mountain being climbed this run */
+  currentMountainIndex: number;
 }
 
 /** Cubic ease-out: fast at start, decelerates to rest — feels like a strong push. */
@@ -76,13 +72,22 @@ export class GameManager {
     this.persistent = createInitialPersistentState();
     this.logUI = new LogUI(() => this.persistent);
     this.stats = getEffectiveStats(this.persistent);
-    this.run = this.createRunState();
+    this.run = this.createRunState(0);
 
     this.setupInput();
     this.showShop();
   }
 
-  private createRunState(): RunState {
+  private get currentMountain(): MountainConfig {
+    return MOUNTAINS[this.run.currentMountainIndex];
+  }
+
+  /** Effective push distance = base push × upgrade multiplier × mountain multiplier */
+  private getEffectivePushDistance(): number {
+    return this.stats.pushDistance * this.currentMountain.pushDistanceMultiplier;
+  }
+
+  private createRunState(mountainIndex: number): RunState {
     return {
       logicalHeight: 0,
       visualHeight: 0,
@@ -94,6 +99,7 @@ export class GameManager {
       peakHeight: 0,
       pushSuccess: 0,
       pushFail: 0,
+      currentMountainIndex: mountainIndex,
     };
   }
 
@@ -106,10 +112,8 @@ export class GameManager {
       if (this.slideSystem.state === 'sliding') return;
 
       this.mouseDown = true;
-      // Pass current zone width so start() can apply the 1/3 constraint
       this.judgmentBar.start(this.staminaSystem.getSuccessZoneWidth());
 
-      // Show judgment bar at the current visual character position
       const headPos = this.renderer.getCharacterHeadScreen(this.run.visualHeight);
       this.judgmentBarUI.show(headPos.sx, headPos.sy);
     });
@@ -131,13 +135,13 @@ export class GameManager {
       if (result === 'success') {
         this.run.pushSuccess++;
 
-        // Advance logical height immediately (game logic)
-        this.run.logicalHeight += this.stats.pushDistance;
+        // Advance logical height with mountain multiplier
+        this.run.logicalHeight += this.getEffectivePushDistance();
         if (this.run.logicalHeight > this.run.peakHeight) {
           this.run.peakHeight = this.run.logicalHeight;
         }
 
-        // Start push animation: from current visual position to new logical target
+        // Start push animation
         this.run.pushAnimFrom = this.run.visualHeight;
         this.run.pushAnimElapsed = 0;
         this.run.isPushAnimating = true;
@@ -148,18 +152,81 @@ export class GameManager {
         // Reset slide timer
         this.slideSystem.onSuccess();
 
-        // Check checkpoints (use logical height for accuracy)
+        // Check checkpoints
         this.checkpointSystem.checkProgress(
           this.run.logicalHeight,
           this.persistent,
           this.run.runEarnings,
         );
+
+        // Check summit
+        this.checkSummit();
       } else {
         this.run.pushFail++;
+        // If stamina depleted and player fails, force immediate slide
+        if (this.staminaSystem.getSuccessZoneWidth() <= 0) {
+          this.slideSystem.forceMaxSlide();
+        }
       }
     });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Debug key: Space = instant push +40 (debug)
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && this.gameState === 'climbing') {
+        e.preventDefault();
+        this.run.logicalHeight += 40;
+        if (this.run.logicalHeight > this.run.peakHeight) {
+          this.run.peakHeight = this.run.logicalHeight;
+        }
+        this.run.pushAnimFrom = this.run.visualHeight;
+        this.run.pushAnimElapsed = 0;
+        this.run.isPushAnimating = true;
+        this.run.pushSuccess++;
+
+        // Reset slide timer so debug push counts as success
+        this.slideSystem.onAttempt();
+        this.slideSystem.onSuccess();
+
+        this.checkpointSystem.checkProgress(
+          this.run.logicalHeight,
+          this.persistent,
+          this.run.runEarnings,
+        );
+        this.checkSummit();
+      }
+    });
+  }
+
+  /** Check if player has reached the mountain summit */
+  private checkSummit(): void {
+    const mountain = this.currentMountain;
+    if (this.run.logicalHeight < mountain.height) return;
+
+    // Clamp height to summit
+    this.run.logicalHeight = mountain.height;
+
+    // First-time summit reward
+    if (!this.persistent.mountainsSummited[mountain.id]) {
+      this.persistent.mountainsSummited[mountain.id] = true;
+      this.persistent.ingot += mountain.summitIngotReward;
+      this.run.runEarnings.ingot += mountain.summitIngotReward;
+
+      // Unlock next mountain
+      const nextIdx = mountain.id + 1;
+      if (nextIdx < MOUNTAINS.length) {
+        this.persistent.mountainsUnlocked[nextIdx] = true;
+        this.persistent.selectedMountainIndex = nextIdx;
+      }
+
+      // Show summit notification
+      this.checkpointSystem.notification = `Summit! +${mountain.summitIngotReward} Ingot`;
+      this.checkpointSystem.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION * 3;
+    }
+
+    // End run → shop (default to next mountain if available)
+    this.endRun();
   }
 
   private showShop(): void {
@@ -173,12 +240,19 @@ export class GameManager {
     this.persistent.totalRuns++;
     this.stats = getEffectiveStats(this.persistent);
 
-    this.run = this.createRunState();
+    const mountainIdx = this.persistent.selectedMountainIndex;
+    const mountain = MOUNTAINS[mountainIdx];
+
+    this.run = this.createRunState(mountainIdx);
     this.staminaSystem.reset(this.stats);
     this.slideSystem.reset();
     this.checkpointSystem.reset();
+    this.checkpointSystem.setCheckpoints(mountain.checkpoints);
     this.judgmentBarUI.hide();
     this.mouseDown = false;
+
+    // Update renderer for new mountain
+    this.renderer.setMountain(mountain);
 
     this.shopUI.hide();
     this.gameState = 'climbing';
@@ -187,6 +261,9 @@ export class GameManager {
     const worldPos = this.renderer.mountain.getWorldPosition(0);
     this.renderer.camera.setTarget(worldPos.x, worldPos.y, 0);
     this.renderer.camera.snap();
+
+    // Update HUD mountain name
+    this.hud.setMountainName(mountain.name);
   }
 
   private endRun(): void {
@@ -198,7 +275,6 @@ export class GameManager {
       this.persistent.highestEver = this.run.peakHeight;
     }
 
-    // Record run for analytics log
     this.persistent.runHistory.push({
       runNumber: this.persistent.totalRuns,
       peakHeight: this.run.peakHeight,
@@ -246,21 +322,10 @@ export class GameManager {
       );
     }
 
-    // 3a. Stamina-depletion check: force immediate max-speed slide
-    if (
-      this.slideSystem.hasAttempted &&
-      this.slideSystem.state !== 'sliding' &&
-      !this.mouseDown &&
-      this.staminaSystem.getSuccessZoneWidth() <= 0
-    ) {
-      this.slideSystem.forceMaxSlide();
-    }
-
-    // 3b. Slide system (affects logical height)
+    // 3. Slide system (affects logical height)
     const slideDelta = this.slideSystem.update(dt, this.run.isWedgeActive);
     if (slideDelta !== 0) {
       this.run.logicalHeight = Math.max(0, this.run.logicalHeight + slideDelta);
-      // During slide, visual follows logical directly (no easing — continuous motion)
       this.run.visualHeight = this.run.logicalHeight;
       this.run.isPushAnimating = false;
     }
@@ -280,7 +345,7 @@ export class GameManager {
       }
     }
 
-    // 5. End-of-run check: sliding and height reached zero
+    // 5. End-of-run check: sliding and height reached zero (mountain base)
     if (this.slideSystem.state === 'sliding' && this.run.logicalHeight <= 0) {
       this.run.logicalHeight = 0;
       this.run.visualHeight = 0;
@@ -294,7 +359,7 @@ export class GameManager {
     // 7. Checkpoint notifications
     this.checkpointSystem.update(dt);
 
-    // 8. HUD — show visual height (matches what player sees)
+    // 8. HUD
     this.hud.update(this.persistent, this.run.visualHeight);
 
     if (this.checkpointSystem.notification) {
@@ -303,11 +368,12 @@ export class GameManager {
       this.hud.hideNotification();
     }
 
-    // 9. Render using visual height
+    // 9. Render
     this.renderer.render(
       this.run.visualHeight,
       this.slideSystem.state,
       this.totalTime,
+      this.checkpointSystem.getCheckpoints(),
       this.checkpointSystem.collectedThisRun,
     );
   }

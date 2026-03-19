@@ -18,6 +18,11 @@ export class CharacterRenderer {
     this.slopeAngleRad = degToRad(MOUNTAIN_SLOPE_ANGLE);
   }
 
+  /** Update slope angle when switching mountains */
+  setSlopeAngle(angleDeg: number): void {
+    this.slopeAngleRad = degToRad(angleDeg);
+  }
+
   render(
     ctx: CanvasRenderingContext2D,
     camera: Camera,

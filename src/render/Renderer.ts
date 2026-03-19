@@ -1,3 +1,4 @@
+import { CheckpointConfig, MountainConfig } from '../config';
 import { Camera } from './Camera';
 import { MountainRenderer } from './MountainRenderer';
 import { CharacterRenderer, SlideVisualState } from './CharacterRenderer';
@@ -19,6 +20,12 @@ export class Renderer {
     window.addEventListener('resize', () => this.resize());
   }
 
+  /** Switch visual theme and slope for a new mountain */
+  setMountain(mountain: MountainConfig): void {
+    this.mountain.setMountain(mountain);
+    this.character.setSlopeAngle(mountain.slopeAngle);
+  }
+
   resize(): void {
     this.canvas.width = this.canvas.clientWidth * window.devicePixelRatio;
     this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
@@ -37,25 +44,19 @@ export class Renderer {
     currentHeight: number,
     slideState: SlideVisualState,
     time: number,
+    checkpoints: CheckpointConfig[],
     collectedCheckpoints: number[],
   ): void {
     const w = this.width;
     const h = this.height;
 
-    // Get character world position
     const worldPos = this.mountain.getWorldPosition(currentHeight);
 
-    // Update camera
     this.camera.setTarget(worldPos.x, worldPos.y, currentHeight);
-    // camera.update is called in game loop
 
-    // Clear and draw
     this.ctx.save();
 
-    // Draw mountain & checkpoints
-    this.mountain.render(this.ctx, this.camera, w, h, collectedCheckpoints, time);
-
-    // Draw character
+    this.mountain.render(this.ctx, this.camera, w, h, checkpoints, collectedCheckpoints, time);
     this.character.render(this.ctx, this.camera, worldPos.x, worldPos.y, w, h, slideState, time);
 
     this.ctx.restore();
