@@ -5,12 +5,10 @@ import { canAfford, spendCurrency, CurrencyCost } from './CurrencyManager';
 /** Get the cost for the next level of an upgrade */
 export function getUpgradeCost(upgradeId: string, currentLevel: number): CurrencyCost {
   const config = UPGRADES[upgradeId];
-  if (!config) return { obolus: Infinity };
+  if (!config) return { obol: Infinity };
   const mult = Math.pow(UPGRADE_COST_MULTIPLIER, currentLevel); // level 0->1 = base cost
   return {
-    obolus: Math.floor(config.baseCost.obolus * mult),
-    drachma: Math.floor(config.baseCost.drachma * mult),
-    stater: Math.floor(config.baseCost.stater * mult),
+    obol: Math.floor(config.baseCost.obol * mult),
   };
 }
 

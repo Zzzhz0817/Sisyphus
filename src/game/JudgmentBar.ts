@@ -1,9 +1,11 @@
 import {
   JUDGMENT_BAR_TOTAL_WIDTH,
   JUDGMENT_POINTER_SPEED,
+  CRIT_ZONE_WIDTH,
+  CRIT_MIN_SUCCESS_WIDTH,
 } from '../config';
 
-export type JudgmentResult = 'success' | 'fail';
+export type JudgmentResult = 'crit' | 'success' | 'fail';
 
 export class JudgmentBar {
   /** Pointer position 0..1 across the bar */
@@ -19,11 +21,11 @@ export class JudgmentBar {
    */
   successZoneOffsetRatio = 0.5;
 
+  /** Whether the crit artifact is active for this attempt */
+  critEnabled = false;
+
   /**
    * Start the judgment bar (mouse down).
-   * @param successZoneWidth Current success zone width in px — used to enforce the
-   *   1/3 constraint: the zone's right edge must extend past the bar's 1/3 mark,
-   *   so even a very narrow zone is never entirely hidden in the leftmost section.
    */
   start(successZoneWidth: number): void {
     this.pointerPosition = 0;
@@ -31,8 +33,6 @@ export class JudgmentBar {
     this.active = true;
 
     // Constraint: zoneLeft + zoneWidth > barWidth/3
-    //  => offsetRatio * availableSpace > barWidth/3 - zoneWidth
-    //  => offsetRatio > (barWidth/3 - zoneWidth) / availableSpace
     const barWidth = JUDGMENT_BAR_TOTAL_WIDTH;
     const availableSpace = Math.max(1, barWidth - successZoneWidth);
     const minOffsetRatio = Math.max(0, (barWidth / 3 - successZoneWidth) / availableSpace);
@@ -70,6 +70,20 @@ export class JudgmentBar {
 
     const pointerPx = this.pointerPosition * barWidth;
 
-    return (pointerPx >= successStart && pointerPx <= successEnd) ? 'success' : 'fail';
+    // Not in success zone at all
+    if (pointerPx < successStart || pointerPx > successEnd) return 'fail';
+
+    // Check crit zone (centered in success zone)
+    if (this.critEnabled && successZoneWidth > CRIT_MIN_SUCCESS_WIDTH) {
+      const critCenter = successStart + successZoneWidth / 2;
+      const critStart = critCenter - CRIT_ZONE_WIDTH / 2;
+      const critEnd = critCenter + CRIT_ZONE_WIDTH / 2;
+
+      if (pointerPx >= critStart && pointerPx <= critEnd) {
+        return 'crit';
+      }
+    }
+
+    return 'success';
   }
 }

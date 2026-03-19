@@ -27,7 +27,7 @@ export class CheckpointSystem {
   checkProgress(
     currentHeight: number,
     persistent: PersistentState,
-    runEarnings: { obolus: number; drachma: number; stater: number; ingot: number },
+    runEarnings: { obol: number; ingot: number },
   ): void {
     for (let i = 0; i < this.checkpoints.length; i++) {
       if (this.collectedThisRun.includes(i)) continue;
@@ -35,16 +35,17 @@ export class CheckpointSystem {
       if (currentHeight >= cp.height) {
         this.collectedThisRun.push(i);
         addCurrency(persistent, cp.reward);
-        runEarnings.obolus += cp.reward.obolus;
-        runEarnings.drachma += cp.reward.drachma;
-        runEarnings.stater += cp.reward.stater;
-
-        const parts: string[] = [];
-        if (cp.reward.obolus > 0) parts.push(`+${cp.reward.obolus} Obolus`);
-        if (cp.reward.drachma > 0) parts.push(`+${cp.reward.drachma} Drachma`);
-        if (cp.reward.stater > 0) parts.push(`+${cp.reward.stater} Stater`);
-        this.notification = parts.join('  ');
-        this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
+        
+        if (cp.reward.obol) {
+          runEarnings.obol += cp.reward.obol;
+          // No notification for obol checkpoints as requested
+        }
+        
+        if (cp.reward.ingot) {
+          runEarnings.ingot += cp.reward.ingot;
+          this.notification = `+${cp.reward.ingot} Ingot`;
+          this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
+        }
       }
     }
 

@@ -28,7 +28,7 @@ export class ShopUI {
     });
   }
 
-  show(state: PersistentState, runEarnings: { obolus: number; drachma: number; stater: number; ingot: number }, onDepart: () => void): void {
+  show(state: PersistentState, runEarnings: { obol: number; ingot: number }, onDepart: () => void): void {
     this.onDepart = onDepart;
     this.overlay.style.display = 'block';
     this.refresh(state, runEarnings);
@@ -38,12 +38,10 @@ export class ShopUI {
     this.overlay.style.display = 'none';
   }
 
-  private refresh(state: PersistentState, runEarnings: { obolus: number; drachma: number; stater: number; ingot: number }): void {
+  private refresh(state: PersistentState, runEarnings: { obol: number; ingot: number }): void {
     this.statsEl.innerHTML = `
       <div style="display: flex; justify-content: center; gap: 24px; align-items: center;">
-        <div class="currency-display"><div class="currency-icon obolus"></div><span>${state.obolus}</span></div>
-        <div class="currency-display"><div class="currency-icon drachma"></div><span>${state.drachma}</span></div>
-        <div class="currency-display"><div class="currency-icon stater"></div><span>${state.stater}</span></div>
+        <div class="currency-display"><div class="currency-icon obol"></div><span>${state.obol}</span></div>
         <div class="currency-display"><div class="currency-icon ingot"></div><span>${state.ingot}</span></div>
       </div>
     `;
@@ -75,11 +73,7 @@ export class ShopUI {
 
       let costText = '';
       if (!maxed) {
-        const parts: string[] = [];
-        if ((cost.obolus ?? 0) > 0) parts.push(`${cost.obolus} C`);
-        if ((cost.drachma ?? 0) > 0) parts.push(`${cost.drachma} S`);
-        if ((cost.stater ?? 0) > 0) parts.push(`${cost.stater} G`);
-        costText = parts.join(' ');
+        costText = `${cost.obol} Obol`;
       }
 
       let statusText = '';
@@ -116,8 +110,8 @@ export class ShopUI {
       this.upgradesContainer.appendChild(card);
     }
 
-    // Artifacts
-    if (state.ingot > 0 || state.craftedArtifacts.length > 0) {
+    // Artifacts (always visible)
+    {
       this.artifactSection.style.display = 'block';
       this.artifactsContainer.innerHTML = '';
 
@@ -163,15 +157,13 @@ export class ShopUI {
 
         this.artifactsContainer.appendChild(card);
       }
-    } else {
-      this.artifactSection.style.display = 'none';
     }
 
     // Mountain selector
     this.renderMountainSelector(state, runEarnings);
   }
 
-  private renderMountainSelector(state: PersistentState, runEarnings: { obolus: number; drachma: number; stater: number; ingot: number }): void {
+  private renderMountainSelector(state: PersistentState, runEarnings: { obol: number; ingot: number }): void {
     let container = document.getElementById('shop-mountain-selector');
     if (!container) {
       container = document.createElement('div');

@@ -83,25 +83,80 @@
     .currency-icon {
       width: 24px;
       height: 24px;
-      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
-      font-weight: bold;
-      color: #333;
-      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
     }
 
-    .currency-icon.obolus  { background: #cd7f32; }
-    .currency-icon.drachma { background: #e0e0e0; }
-    .currency-icon.stater  { background: #ffd700; }
-    .currency-icon.ingot   { background: linear-gradient(135deg, #b87333, #ffd700); border-radius: 4px; }
+    /* Obol (Silver coin with skull) */
+    .currency-icon.obol { 
+      background: #e0e0e0;
+      border-radius: 50%;
+      border: 2px solid #FAFAFA;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2), 0 0 0 1px #455A64;
+      position: relative;
+    }
+    .currency-icon.obol::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      /* Using a combination of borders and background to make a cute skull */
+      background: #9E9E9E;
+      border-radius: 5px 5px 2px 2px;
+      /* Eyes */
+      background-image: 
+        radial-gradient(circle at 3px 4px, #e0e0e0 1.5px, transparent 1.5px),
+        radial-gradient(circle at 7px 4px, #e0e0e0 1.5px, transparent 1.5px);
+      box-sizing: border-box;
+    }
+    .currency-icon.obol::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1px solid #9E9E9E;
+      z-index: 1;
+    }
+    /* Adding teeth via another pseudo element isn't possible directly since we used both, 
+       so we'll just use a linear gradient on the after element for teeth */
+    .currency-icon.obol::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #9E9E9E;
+      border-radius: 5px 5px 2px 2px;
+      background-image: 
+        /* Eyes */
+        radial-gradient(circle at 3px 4px, #e0e0e0 1.5px, transparent 1.5px),
+        radial-gradient(circle at 7px 4px, #e0e0e0 1.5px, transparent 1.5px),
+        /* Teeth */
+        linear-gradient(to right, transparent 2px, #e0e0e0 2px, #e0e0e0 3px, transparent 3px, transparent 5px, #e0e0e0 5px, #e0e0e0 6px, transparent 6px, transparent 8px, #e0e0e0 8px, #e0e0e0 9px, transparent 9px);
+      background-size: 10px 10px, 10px 10px, 10px 3px;
+      background-position: 0 0, 0 0, 0 7px;
+      background-repeat: no-repeat;
+      box-sizing: border-box;
+    }
 
-    .currency-icon.obolus::after  { content: 'C'; }
-    .currency-icon.drachma::after { content: 'S'; }
-    .currency-icon.stater::after  { content: 'G'; }
-    .currency-icon.ingot::after   { content: 'I'; }
+    /* Ingot (Gold trapezoid) */
+    .currency-icon.ingot { 
+      width: 28px;
+      height: 20px;
+      background: #FFCA28;
+      clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+      position: relative;
+      border-bottom: 2px solid #b87333;
+      color: transparent;
+    }
+    .currency-icon.ingot::after { 
+      content: '';
+      position: absolute;
+      top: 2px; left: 4px; right: 4px; bottom: 2px;
+      clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+      border: 1px solid #FFE082;
+    }
 
     #hud-right {
       display: flex;
@@ -491,9 +546,7 @@
     <!-- HUD -->
     <div id="hud">
       <div class="hud-panel" id="hud-left">
-        <div class="currency-display"><div class="currency-icon obolus"></div> <span id="hud-obolus">0</span></div>
-        <div class="currency-display"><div class="currency-icon drachma"></div> <span id="hud-drachma">0</span></div>
-        <div class="currency-display"><div class="currency-icon stater"></div> <span id="hud-stater">0</span></div>
+        <div class="currency-display"><div class="currency-icon obol"></div> <span id="hud-obol">0</span></div>
         <div class="currency-display"><div class="currency-icon ingot"></div> <span id="hud-ingot">0</span></div>
       </div>
       <div id="hud-right">

@@ -13,7 +13,7 @@ import {
   getEffectiveStats,
   EffectiveStats,
 } from '../player/PlayerState';
-import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION } from '../config';
+import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION, DUAL_PUSH_STAMINA_DISCOUNT, CRIT_MULTIPLIER } from '../config';
 import { lerp } from '../utils/helpers';
 
 export type GameState = 'climbing' | 'shop';
@@ -27,7 +27,7 @@ interface RunState {
   pushAnimElapsed: number;
   isPushAnimating: boolean;
   isWedgeActive: boolean;
-  runEarnings: { obolus: number; drachma: number; stater: number; ingot: number };
+  runEarnings: { obol: number; ingot: number };
   peakHeight: number;
   pushSuccess: number;
   pushFail: number;
@@ -60,6 +60,14 @@ export class GameManager {
   private totalTime = 0;
   private mouseDown = false;
 
+  // Dual Push artifact state
+  /** Which mouse button is currently held (0=left, 2=right, -1=none) */
+  private currentButton = -1;
+  /** Which button was used for the LAST successful push (0=left, 2=right, -1=none) */
+  private lastSuccessButton = -1;
+  /** Whether the current attempt qualifies for alternating bonus */
+  private dualPushBonusActive = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
     this.judgmentBar = new JudgmentBar();
@@ -87,6 +95,16 @@ export class GameManager {
     return this.stats.pushDistance * this.currentMountain.pushDistanceMultiplier;
   }
 
+  /** Whether the Dual Push artifact is equipped */
+  private get hasDualPush(): boolean {
+    return this.persistent.equippedArtifacts.includes('dualPush');
+  }
+
+  /** Whether the Critical Hit artifact is equipped */
+  private get hasCritHit(): boolean {
+    return this.persistent.equippedArtifacts.includes('criticalHit');
+  }
+
   private createRunState(mountainIndex: number): RunState {
     return {
       logicalHeight: 0,
@@ -95,7 +113,7 @@ export class GameManager {
       pushAnimElapsed: 0,
       isPushAnimating: false,
       isWedgeActive: false,
-      runEarnings: { obolus: 0, drachma: 0, stater: 0, ingot: 0 },
+      runEarnings: { obol: 0, ingot: 0 },
       peakHeight: 0,
       pushSuccess: 0,
       pushFail: 0,
@@ -108,20 +126,38 @@ export class GameManager {
 
     canvas.addEventListener('mousedown', (e) => {
       if (this.gameState !== 'climbing') return;
-      if (e.button !== 0) return;
       if (this.slideSystem.state === 'sliding') return;
 
-      this.mouseDown = true;
-      this.judgmentBar.start(this.staminaSystem.getSuccessZoneWidth());
+      // Accept left (0) always; accept right (2) only with Dual Push
+      if (e.button === 0 || (e.button === 2 && this.hasDualPush)) {
+        this.mouseDown = true;
+        this.currentButton = e.button;
 
-      const headPos = this.renderer.getCharacterHeadScreen(this.run.visualHeight);
-      this.judgmentBarUI.show(headPos.sx, headPos.sy);
+        // Determine if alternate bonus is active for this attempt
+        this.dualPushBonusActive =
+          this.hasDualPush &&
+          this.lastSuccessButton !== -1 &&
+          this.currentButton !== this.lastSuccessButton;
+
+        // Set crit state on both bar and UI
+        this.judgmentBar.critEnabled = this.hasCritHit;
+        this.judgmentBarUI.setCritEnabled(this.hasCritHit);
+
+        this.judgmentBar.start(this.staminaSystem.getSuccessZoneWidth());
+
+        const headPos = this.renderer.getCharacterHeadScreen(this.run.visualHeight);
+        this.judgmentBarUI.show(headPos.sx, headPos.sy);
+
+        // Update pointer color for alternate bonus
+        this.judgmentBarUI.setAlternateBonus(this.dualPushBonusActive);
+      }
     });
 
     canvas.addEventListener('mouseup', (e) => {
       if (this.gameState !== 'climbing') return;
-      if (e.button !== 0) return;
       if (!this.mouseDown) return;
+      // Only respond to the button that started the press
+      if (e.button !== this.currentButton) return;
 
       this.mouseDown = false;
 
@@ -132,11 +168,12 @@ export class GameManager {
       // Mark attempted (starts slide timer if first attempt)
       this.slideSystem.onAttempt();
 
-      if (result === 'success') {
+      if (result === 'success' || result === 'crit') {
         this.run.pushSuccess++;
 
-        // Advance logical height with mountain multiplier
-        this.run.logicalHeight += this.getEffectivePushDistance();
+        // Advance logical height (2x on crit)
+        const pushDist = this.getEffectivePushDistance() * (result === 'crit' ? CRIT_MULTIPLIER : 1);
+        this.run.logicalHeight += pushDist;
         if (this.run.logicalHeight > this.run.peakHeight) {
           this.run.peakHeight = this.run.logicalHeight;
         }
@@ -146,8 +183,13 @@ export class GameManager {
         this.run.pushAnimElapsed = 0;
         this.run.isPushAnimating = true;
 
-        // Consume stamina
-        this.staminaSystem.consumeOnSuccess();
+        // Consume stamina (half cost if alternate bonus)
+        this.staminaSystem.consumeOnSuccess(
+          this.dualPushBonusActive ? DUAL_PUSH_STAMINA_DISCOUNT : 1.0,
+        );
+
+        // Track last success button for alternating detection
+        this.lastSuccessButton = this.currentButton;
 
         // Reset slide timer
         this.slideSystem.onSuccess();
@@ -168,6 +210,9 @@ export class GameManager {
           this.slideSystem.forceMaxSlide();
         }
       }
+
+      this.currentButton = -1;
+      this.dualPushBonusActive = false;
     });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -250,6 +295,9 @@ export class GameManager {
     this.checkpointSystem.setCheckpoints(mountain.checkpoints);
     this.judgmentBarUI.hide();
     this.mouseDown = false;
+    this.currentButton = -1;
+    this.lastSuccessButton = -1;
+    this.dualPushBonusActive = false;
 
     // Update renderer for new mountain
     this.renderer.setMountain(mountain);

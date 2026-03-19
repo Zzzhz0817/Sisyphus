@@ -19,9 +19,9 @@ export class StaminaSystem {
     this.current = stats.staminaMax;
   }
 
-  /** Called when a successful judgment occurs */
-  consumeOnSuccess(): void {
-    this.current = Math.max(0, this.current - this.stats.staminaCost);
+  /** Called when a successful judgment occurs. costMultiplier < 1 reduces cost (e.g. dual push bonus). */
+  consumeOnSuccess(costMultiplier = 1.0): void {
+    this.current = Math.max(0, this.current - this.stats.staminaCost * costMultiplier);
   }
 
   /** Called every frame to regenerate stamina */

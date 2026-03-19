@@ -1,9 +1,7 @@
 import { PersistentState } from '../player/PlayerState';
 
 export class HUD {
-  private obolusEl: HTMLElement;
-  private drachmaEl: HTMLElement;
-  private staterEl: HTMLElement;
+  private obolEl: HTMLElement;
   private ingotEl: HTMLElement;
   private heightEl: HTMLElement;
   private notificationEl: HTMLElement;
@@ -11,9 +9,7 @@ export class HUD {
   private notificationVisible = false;
 
   constructor() {
-    this.obolusEl = document.getElementById('hud-obolus')!;
-    this.drachmaEl = document.getElementById('hud-drachma')!;
-    this.staterEl = document.getElementById('hud-stater')!;
+    this.obolEl = document.getElementById('hud-obol')!;
     this.ingotEl = document.getElementById('hud-ingot')!;
     this.heightEl = document.getElementById('hud-height')!;
     this.notificationEl = document.getElementById('checkpoint-notification')!;
@@ -27,9 +23,7 @@ export class HUD {
   }
 
   update(persistent: PersistentState, currentHeight: number): void {
-    this.obolusEl.textContent = String(persistent.obolus);
-    this.drachmaEl.textContent = String(persistent.drachma);
-    this.staterEl.textContent = String(persistent.stater);
+    this.obolEl.textContent = String(persistent.obol);
     this.ingotEl.textContent = String(persistent.ingot);
     this.heightEl.textContent = `${Math.floor(currentHeight)}m`;
   }

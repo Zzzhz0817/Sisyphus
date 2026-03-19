@@ -232,61 +232,150 @@ export class MountainRenderer {
       const cp = checkpoints[i];
       const pos = heightToSlopePosition(cp.height, this.slopeAngleRad);
       const screen = camera.worldToScreen(pos.x, pos.y, canvasWidth, canvasHeight);
-      const r = CHECKPOINT_VISUAL_RADIUS * camera.zoom;
       const collected = collectedCheckpoints.includes(i);
-
-      const postWidth = 10 * camera.zoom;
-      const postHeight = 36 * camera.zoom;
-      const postLift = 6 * camera.zoom;
-
-      ctx.fillStyle = '#CFD8DC';
-      ctx.fillRect(screen.sx - postWidth / 2, screen.sy - postHeight - postLift, postWidth, postHeight);
-      ctx.fillStyle = '#ECEFF1';
-      ctx.fillRect(screen.sx - postWidth / 2 + 2, screen.sy - postHeight - postLift + 2, postWidth - 4, postHeight - 2);
-
-      ctx.save();
-      const lift = 4 * camera.zoom;
-      ctx.translate(screen.sx, screen.sy);
-      ctx.rotate(-this.slopeAngleRad);
-      ctx.translate(0, -lift);
-      const domeRadius = 18 * camera.zoom;
-      ctx.scale(1, 0.6);
-      ctx.beginPath();
-      ctx.arc(0, 0, domeRadius, 0, Math.PI, true);
-      ctx.fillStyle = '#90A4AE';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(0, 0, domeRadius * 0.7, 0, Math.PI, true);
-      ctx.fillStyle = '#B0BEC5';
-      ctx.fill();
-      ctx.fillStyle = '#607D8B';
-      ctx.fillRect(-domeRadius * 1.1, -2 * camera.zoom, domeRadius * 2.2, 10 * camera.zoom);
-      ctx.restore();
-
       const floatOffset = Math.sin(time * 4 + i) * 6 * camera.zoom;
-      const orbY = screen.sy - postHeight - postLift - r * 1.2 + floatOffset;
-      const glowColor = collected ? 'rgba(144, 164, 174, 0.6)' : 'rgba(255, 213, 79, 0.7)';
-      const orbColor = collected ? '#90A4AE' : '#FFCA28';
-      const orbOutline = collected ? '#546E7A' : '#FFF9C4';
-      const glowGradient = ctx.createRadialGradient(screen.sx, orbY, r * 0.2, screen.sx, orbY, r * 3);
-      glowGradient.addColorStop(0, glowColor);
-      glowGradient.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glowGradient;
-      ctx.beginPath();
-      ctx.arc(screen.sx, orbY, r * 3, 0, Math.PI * 2);
-      ctx.fill();
 
-      ctx.fillStyle = orbColor;
-      ctx.beginPath();
-      ctx.moveTo(screen.sx, orbY - r * 1.2);
-      ctx.lineTo(screen.sx + r * 1.2, orbY);
-      ctx.lineTo(screen.sx, orbY + r * 1.2);
-      ctx.lineTo(screen.sx - r * 1.2, orbY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = orbOutline;
-      ctx.lineWidth = 2.5 * camera.zoom;
-      ctx.stroke();
+      if (cp.reward.ingot) {
+        // --- INGOT CHECKPOINT (Fancy with post and dome) ---
+        const r = CHECKPOINT_VISUAL_RADIUS * camera.zoom;
+        const postWidth = 10 * camera.zoom;
+        const postHeight = 36 * camera.zoom;
+        const postLift = 6 * camera.zoom;
+
+        ctx.fillStyle = '#CFD8DC';
+        ctx.fillRect(screen.sx - postWidth / 2, screen.sy - postHeight - postLift, postWidth, postHeight);
+        ctx.fillStyle = '#ECEFF1';
+        ctx.fillRect(screen.sx - postWidth / 2 + 2, screen.sy - postHeight - postLift + 2, postWidth - 4, postHeight - 2);
+
+        ctx.save();
+        const lift = 4 * camera.zoom;
+        ctx.translate(screen.sx, screen.sy);
+        ctx.rotate(-this.slopeAngleRad);
+        ctx.translate(0, -lift);
+        const domeRadius = 18 * camera.zoom;
+        ctx.scale(1, 0.6);
+        ctx.beginPath();
+        ctx.arc(0, 0, domeRadius, 0, Math.PI, true);
+        ctx.fillStyle = '#90A4AE';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, domeRadius * 0.7, 0, Math.PI, true);
+        ctx.fillStyle = '#B0BEC5';
+        ctx.fill();
+        ctx.fillStyle = '#607D8B';
+        ctx.fillRect(-domeRadius * 1.1, -2 * camera.zoom, domeRadius * 2.2, 10 * camera.zoom);
+        ctx.restore();
+
+        const orbY = screen.sy - postHeight - postLift - r * 1.2 + floatOffset;
+        const glowColor = collected ? 'rgba(144, 164, 174, 0.6)' : 'rgba(255, 213, 79, 0.7)';
+        const orbColor = collected ? '#90A4AE' : '#FFCA28';
+        const orbOutline = collected ? '#546E7A' : '#FFF9C4';
+        
+        const glowGradient = ctx.createRadialGradient(screen.sx, orbY, r * 0.2, screen.sx, orbY, r * 3);
+        glowGradient.addColorStop(0, glowColor);
+        glowGradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glowGradient;
+        ctx.beginPath();
+        ctx.arc(screen.sx, orbY, r * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Ingot (Trapezoid)
+        const topW = r * 0.8;
+        const botW = r * 1.4;
+        const h = r * 1.2;
+        
+        ctx.fillStyle = orbColor;
+        ctx.beginPath();
+        ctx.moveTo(screen.sx - topW, orbY - h/2);
+        ctx.lineTo(screen.sx + topW, orbY - h/2);
+        ctx.lineTo(screen.sx + botW, orbY + h/2);
+        ctx.lineTo(screen.sx - botW, orbY + h/2);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.strokeStyle = orbOutline;
+        ctx.lineWidth = 2.5 * camera.zoom;
+        ctx.stroke();
+        
+        // Inner detail for ingot
+        ctx.strokeStyle = collected ? '#78909C' : '#FFE082';
+        ctx.lineWidth = 1 * camera.zoom;
+        ctx.beginPath();
+        ctx.moveTo(screen.sx - topW + 2*camera.zoom, orbY - h/2 + 2*camera.zoom);
+        ctx.lineTo(screen.sx + topW - 2*camera.zoom, orbY - h/2 + 2*camera.zoom);
+        ctx.lineTo(screen.sx + botW - 3*camera.zoom, orbY + h/2 - 2*camera.zoom);
+        ctx.lineTo(screen.sx - botW + 3*camera.zoom, orbY + h/2 - 2*camera.zoom);
+        ctx.closePath();
+        ctx.stroke();
+
+      } else {
+        // --- OBOL CHECKPOINT (Small coin with skull) ---
+        const r = CHECKPOINT_VISUAL_RADIUS * 0.33 * camera.zoom; // Smaller (1/3 of original size)
+        const coinY = screen.sy - r * 1.5 + floatOffset; // Float closer to the ground
+        
+        const glowColor = collected ? 'rgba(144, 164, 174, 0.4)' : 'rgba(224, 224, 224, 0.6)';
+        const coinColor = collected ? '#78909C' : '#E0E0E0';
+        const coinOutline = collected ? '#455A64' : '#FAFAFA';
+        const skullColor = collected ? '#546E7A' : '#9E9E9E';
+
+        // Subtle glow
+        const glowGradient = ctx.createRadialGradient(screen.sx, coinY, r * 0.2, screen.sx, coinY, r * 2);
+        glowGradient.addColorStop(0, glowColor);
+        glowGradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glowGradient;
+        ctx.beginPath();
+        ctx.arc(screen.sx, coinY, r * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Coin base
+        ctx.fillStyle = coinColor;
+        ctx.beginPath();
+        ctx.arc(screen.sx, coinY, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = coinOutline;
+        ctx.lineWidth = 2 * camera.zoom;
+        ctx.stroke();
+
+        // Inner rim
+        ctx.strokeStyle = skullColor;
+        ctx.lineWidth = 0.5 * camera.zoom;
+        ctx.beginPath();
+        ctx.arc(screen.sx, coinY, r * 0.8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Cute Skull (简笔画骷髅头)
+        ctx.fillStyle = skullColor;
+        // Skull top half (semi-circle)
+        const skullR = r * 0.45;
+        ctx.beginPath();
+        ctx.arc(screen.sx, coinY - skullR*0.1, skullR, Math.PI, 0);
+        // Skull bottom half (jaw)
+        ctx.lineTo(screen.sx + skullR*0.6, coinY + skullR*0.9);
+        ctx.lineTo(screen.sx - skullR*0.6, coinY + skullR*0.9);
+        ctx.closePath();
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = coinColor; // punch out eyes
+        ctx.beginPath();
+        ctx.arc(screen.sx - skullR*0.4, coinY + skullR*0.1, skullR*0.25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(screen.sx + skullR*0.4, coinY + skullR*0.1, skullR*0.25, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Teeth lines
+        ctx.strokeStyle = coinColor;
+        ctx.lineWidth = 1 * camera.zoom;
+        ctx.beginPath();
+        ctx.moveTo(screen.sx - skullR*0.3, coinY + skullR*0.5);
+        ctx.lineTo(screen.sx - skullR*0.3, coinY + skullR*0.9);
+        ctx.moveTo(screen.sx, coinY + skullR*0.5);
+        ctx.lineTo(screen.sx, coinY + skullR*0.9);
+        ctx.moveTo(screen.sx + skullR*0.3, coinY + skullR*0.5);
+        ctx.lineTo(screen.sx + skullR*0.3, coinY + skullR*0.9);
+        ctx.stroke();
+      }
     }
   }
 

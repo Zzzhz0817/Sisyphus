@@ -8,14 +8,12 @@ export interface RunRecord {
   pushFail: number;
   qteAttempted: number;
   qteSuccess: number;
-  earnings: { obolus: number; drachma: number; stater: number; ingot: number };
+  earnings: { obol: number; ingot: number };
 }
 
 /** Persistent state across runs (reset on page refresh) */
 export interface PersistentState {
-  obolus: number;
-  drachma: number;
-  stater: number;
+  obol: number;
   ingot: number;
   upgradeLevels: Record<string, number>;
   craftedArtifacts: string[];
@@ -40,10 +38,8 @@ export interface EffectiveStats {
 
 export function createInitialPersistentState(): PersistentState {
   return {
-    obolus: 0,
-    drachma: 0,
-    stater: 0,
-    ingot: 0,
+    obol: 0,
+    ingot: 1,
     upgradeLevels: {},
     craftedArtifacts: [],
     equippedArtifacts: [],

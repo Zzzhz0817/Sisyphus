@@ -52,10 +52,8 @@ export class LogUI {
       const attempts = r.pushSuccess + r.pushFail;
       const hitRate = attempts > 0 ? Math.round((r.pushSuccess / attempts) * 100) : 0;
       const earningStr = [
-        r.earnings.obolus > 0 ? `${r.earnings.obolus}C` : '',
-        r.earnings.drachma > 0 ? `${r.earnings.drachma}S` : '',
-        r.earnings.stater > 0 ? `${r.earnings.stater}G` : '',
-        r.earnings.ingot > 0 ? `${r.earnings.ingot}I` : '',
+        r.earnings.obol > 0 ? `${r.earnings.obol} Obol` : '',
+        r.earnings.ingot > 0 ? `${r.earnings.ingot} Ingot` : '',
       ].filter(Boolean).join(' ') || '—';
       const qteStr = r.qteAttempted > 0
         ? `${r.qteSuccess}/${r.qteAttempted}`
