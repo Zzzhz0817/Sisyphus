@@ -39,7 +39,7 @@ export interface EffectiveStats {
 export function createInitialPersistentState(): PersistentState {
   return {
     obol: 0,
-    ingot: 1,
+    ingot: 0,
     upgradeLevels: {},
     craftedArtifacts: [],
     equippedArtifacts: [],

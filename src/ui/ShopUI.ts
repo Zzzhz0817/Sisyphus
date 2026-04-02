@@ -110,9 +110,10 @@ export class ShopUI {
       this.upgradesContainer.appendChild(card);
     }
 
-    // Artifacts (always visible)
+    // Artifacts (visible only after player has obtained at least one ingot or crafted an artifact)
     {
-      this.artifactSection.style.display = 'block';
+      const shouldShowArtifacts = state.ingot > 0 || state.craftedArtifacts.length > 0;
+      this.artifactSection.style.display = shouldShowArtifacts ? 'block' : 'none';
       this.artifactsContainer.innerHTML = '';
 
       for (const artifact of ARTIFACTS) {
@@ -164,6 +165,16 @@ export class ShopUI {
   }
 
   private renderMountainSelector(state: PersistentState, runEarnings: { obol: number; ingot: number }): void {
+    // Only show after player has summited the first mountain (index 0)
+    if (!state.mountainsSummited[0]) {
+      // Hide container if it exists
+      const existingContainer = document.getElementById('shop-mountain-selector');
+      if (existingContainer) {
+        existingContainer.style.display = 'none';
+      }
+      return;
+    }
+
     let container = document.getElementById('shop-mountain-selector');
     if (!container) {
       container = document.createElement('div');
@@ -171,6 +182,7 @@ export class ShopUI {
       // Insert before the depart button
       this.departBtn.parentElement!.insertBefore(container, this.departBtn);
     }
+    container.style.display = '';
 
     container.innerHTML = `
       <div style="margin: 20px 0 10px; text-align: center; font-family: 'Cinzel', serif; color: var(--primary-gold, #FFD740); font-size: 16px; letter-spacing: 1px;">

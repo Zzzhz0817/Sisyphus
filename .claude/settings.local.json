@@ -6,7 +6,13 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "WebSearch",
+      "WebFetch(domain:pmc.ncbi.nlm.nih.gov)",
+      "WebFetch(domain:osu.ppy.sh)",
+      "WebFetch(domain:brill.com)",
+      "WebFetch(domain:cdn.carleton.edu)",
+      "WebFetch(domain:www2.oberlin.edu)"
     ]
   }
 }
