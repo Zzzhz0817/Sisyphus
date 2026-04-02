@@ -73,7 +73,10 @@ export class ShopUI {
 
       let costText = '';
       if (!maxed) {
-        costText = `${cost.obol} Obol`;
+        costText = `
+          <div class="currency-icon obol" style="transform: scale(0.8); transform-origin: center;"></div>
+          <span>${cost.obol}</span>
+        `;
       }
 
       let statusText = '';
@@ -82,7 +85,7 @@ export class ShopUI {
         if (config.prerequisite) {
           const [pid, plvl] = config.prerequisite.split(':');
           const pConfig = UPGRADES[pid];
-          statusText = `Requires ${pConfig?.name ?? pid} Lv${plvl}`;
+          statusText = `<span style="font-size: 12px;">Requires ${pConfig?.name ?? pid} Lv${plvl}</span>`;
         } else {
           statusText = 'Locked';
         }
@@ -90,11 +93,23 @@ export class ShopUI {
         statusText = costText;
       }
 
+      const progressPercent = (level / config.maxLevel) * 100;
+
       card.innerHTML = `
-        <div class="upgrade-name">${config.name} <span style="float:right; font-size:12px; opacity:0.7">Lv ${level}/${config.maxLevel}</span></div>
-        <div class="upgrade-desc">${config.description}</div>
-        <div class="upgrade-cost" ${!affordable && !maxed && !locked ? 'style="color:var(--fail-red)"' : ''}>
+        <div class="pillar-top">
+          <div class="upgrade-name">${config.name}</div>
+          <div class="upgrade-level">Level ${level} / ${config.maxLevel}</div>
+        </div>
+        <div class="pillar-mid">
+          <div class="upgrade-desc">${config.description}</div>
+          <div class="upgrade-progress-bg">
+            <div class="upgrade-progress-fill" style="width: ${progressPercent}%"></div>
+          </div>
+        </div>
+        <div class="pillar-bottom">
+          <div class="upgrade-cost" ${!affordable && !maxed && !locked ? 'style="color:var(--fail-red)"' : ''}>
             ${statusText}
+          </div>
         </div>
       `;
 
@@ -122,7 +137,7 @@ export class ShopUI {
         const canCraft = !crafted && state.ingot >= artifact.ingotCost;
 
         const card = document.createElement('div');
-        card.className = 'artifact-card';
+        card.className = 'artifact-pedestal';
         if (crafted) card.classList.add('crafted');
         if (equipped) card.classList.add('equipped');
         if (!crafted && !canCraft) card.classList.add('unavailable');
@@ -130,13 +145,28 @@ export class ShopUI {
         let actionText = '';
         if (equipped) actionText = 'EQUIPPED (Click to unequip)';
         else if (crafted) actionText = 'OWNED (Click to equip)';
-        else actionText = `${artifact.ingotCost} Ingot to Craft`;
+        else actionText = `
+          <div class="currency-icon ingot" style="transform: scale(0.8); transform-origin: center;"></div>
+          <span>${artifact.ingotCost} to Craft</span>
+        `;
+
+        // Map artifact ID to specific CSS icon class
+        let iconClass = 'art-ares'; // Default
+        if (artifact.id === 'dualPush') iconClass = 'art-heracles';
+        if (artifact.id === 'wedge') iconClass = 'art-hephaestus';
+        if (artifact.id === 'qte') iconClass = 'art-wheel';
 
         card.innerHTML = `
+          <div class="artifact-icon-container">
+            <div class="art-icon ${iconClass}"></div>
+          </div>
           <div class="artifact-name">${artifact.name}</div>
-          <div class="artifact-desc">${artifact.description}</div>
           <div class="artifact-cost" style="${equipped ? 'color:var(--success-green)' : crafted ? 'color:var(--primary-gold)' : ''}">
             ${actionText}
+          </div>
+          <div class="artifact-tooltip">
+            <div class="artifact-name" style="font-size: 14px; margin-bottom: 4px;">${artifact.name}</div>
+            <div class="artifact-desc" style="margin-bottom: 0;">${artifact.description}</div>
           </div>
         `;
 
@@ -179,16 +209,15 @@ export class ShopUI {
     if (!container) {
       container = document.createElement('div');
       container.id = 'shop-mountain-selector';
+      container.className = 'shop-section';
       // Insert before the depart button
       this.departBtn.parentElement!.insertBefore(container, this.departBtn);
     }
     container.style.display = '';
 
     container.innerHTML = `
-      <div style="margin: 20px 0 10px; text-align: center; font-family: 'Cinzel', serif; color: var(--primary-gold, #FFD740); font-size: 16px; letter-spacing: 1px;">
-        Choose Your Mountain
-      </div>
-      <div id="mountain-options" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;"></div>
+      <h2>Choose Your Mountain</h2>
+      <div class="mountain-track" id="mountain-options"></div>
     `;
 
     const optionsEl = container.querySelector('#mountain-options')!;
@@ -199,47 +228,43 @@ export class ShopUI {
       const summited = state.mountainsSummited[i];
       const selected = state.selectedMountainIndex === i;
 
-      const option = document.createElement('div');
-      option.style.cssText = `
-        display: flex; align-items: center; gap: 12px;
-        padding: 10px 16px; border-radius: 8px; cursor: ${unlocked ? 'pointer' : 'default'};
-        background: ${selected ? 'rgba(255, 215, 64, 0.15)' : 'rgba(255,255,255,0.05)'};
-        border: 2px solid ${selected ? 'var(--primary-gold, #FFD740)' : 'rgba(255,255,255,0.1)'};
-        opacity: ${unlocked ? '1' : '0.4'};
-        transition: all 0.2s;
-      `;
+      const node = document.createElement('div');
+      node.className = `mountain-node ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}`;
 
-      const radio = selected ? '&#9679;' : '&#9675;';
-      const lockIcon = unlocked ? '' : ' &#128274;';
-      const summitBadge = summited ? ' <span style="color:#4caf50; font-size:12px;">&#10003; Summited</span>' : '';
-      const multiplierColor = m.pushDistanceMultiplier < 1 ? '#FF5252' : '#4caf50';
+      const multiplierColor = m.pushDistanceMultiplier < 1 ? 'var(--fail-red)' : 'var(--success-green)';
+      
+      let markerHtml = '';
+      if (selected) {
+        markerHtml = `<div class="mountain-marker">▼</div>`;
+      } else if (!unlocked) {
+        markerHtml = `<div class="mountain-marker" style="animation:none; color:#888; font-size:18px;">🔒</div>`;
+      } else if (summited) {
+        markerHtml = `<div class="mountain-marker" style="animation:none; color:var(--success-green); font-size:16px;">★</div>`;
+      }
 
-      option.innerHTML = `
-        <span style="font-size: 18px; color: var(--primary-gold, #FFD740);">${radio}</span>
-        <div style="flex: 1;">
-          <div style="font-family: 'Cinzel', serif; font-size: 14px; color: #fff;">
-            ${m.name}${lockIcon}${summitBadge}
-          </div>
-          <div style="font-size: 11px; color: rgba(255,255,255,0.6);">
-            Height: ${m.height.toLocaleString()} | Push: <span style="color:${multiplierColor}">&times;${m.pushDistanceMultiplier}</span>
+      node.innerHTML = `
+        <div class="mountain-visuals">
+          ${markerHtml}
+          <div class="mountain-glow"></div>
+          <div class="mountain-peak"></div>
+        </div>
+        <div class="mountain-info">
+          <div class="mountain-name">${m.name}</div>
+          <div class="mountain-stats">
+            ${m.height.toLocaleString()}m<br>
+            Push: <span style="color:${multiplierColor}">&times;${m.pushDistanceMultiplier}</span>
           </div>
         </div>
       `;
 
       if (unlocked) {
-        option.addEventListener('click', () => {
+        node.addEventListener('click', () => {
           state.selectedMountainIndex = i;
           this.refresh(state, runEarnings);
         });
-        option.addEventListener('mouseenter', () => {
-          if (!selected) option.style.background = 'rgba(255, 215, 64, 0.08)';
-        });
-        option.addEventListener('mouseleave', () => {
-          if (!selected) option.style.background = 'rgba(255,255,255,0.05)';
-        });
       }
 
-      optionsEl.appendChild(option);
+      optionsEl.appendChild(node);
     }
   }
 }
