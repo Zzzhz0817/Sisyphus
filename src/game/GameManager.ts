@@ -13,10 +13,10 @@ import {
   getEffectiveStats,
   EffectiveStats,
 } from '../player/PlayerState';
-import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION, DUAL_PUSH_STAMINA_DISCOUNT, CRIT_MULTIPLIER } from '../config';
+import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION, DUAL_PUSH_STAMINA_DISCOUNT, CRIT_MULTIPLIER, DESCENT_ROLL_SPEED } from '../config';
 import { lerp } from '../utils/helpers';
 
-export type GameState = 'climbing' | 'shop';
+export type GameState = 'climbing' | 'descending' | 'shop';
 
 interface RunState {
   /** True game-logic height relative to current mountain base (0 = base, mountainHeight = summit). */
@@ -55,6 +55,8 @@ export class GameManager {
   private stats: EffectiveStats;
   private run: RunState;
   private gameState: GameState = 'shop';
+  private descentZoom = 0;
+  private testPushBtn: HTMLElement;
 
   private lastTime = 0;
   private totalTime = 0;
@@ -81,6 +83,10 @@ export class GameManager {
     this.logUI = new LogUI(() => this.persistent);
     this.stats = getEffectiveStats(this.persistent);
     this.run = this.createRunState(0);
+
+    // 初始化测试按钮
+    this.testPushBtn = document.getElementById('test-push-btn')!;
+    this.testPushBtn.addEventListener('click', () => this.testPush());
 
     this.setupInput();
     this.showShop();
@@ -247,10 +253,12 @@ export class GameManager {
   /** Check if player has reached the mountain summit */
   private checkSummit(): void {
     const mountain = this.currentMountain;
-    if (this.run.logicalHeight < mountain.height) return;
+    const profile = this.renderer.mountain.getTerrainProfile();
+    const summitHeight = profile.getSummitHeight();
+    if (this.run.logicalHeight < summitHeight) return;
 
     // Clamp height to summit
-    this.run.logicalHeight = mountain.height;
+    this.run.logicalHeight = summitHeight;
 
     // First-time summit reward
     if (!this.persistent.mountainsSummited[mountain.id]) {
@@ -270,15 +278,29 @@ export class GameManager {
       this.checkpointSystem.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION * 3;
     }
 
-    // End run → shop (default to next mountain if available)
-    this.endRun();
+    // 禁用所有玩家输入
+    this.judgmentBarUI.hide();
+    this.mouseDown = false;
+    this.judgmentBar.active = false;
+
+    // 记录登顶时的 zoom，供下山阶段使用
+    this.descentZoom = this.renderer.camera.zoom;
+
+    // 只切状态，不调 endRun()
+    this.gameState = 'descending';
+    this.updateTestButtonVisibility();
   }
 
   private showShop(): void {
     this.gameState = 'shop';
+    this.updateTestButtonVisibility();
     this.shopUI.show(this.persistent, this.run.runEarnings, () => {
       this.startNewRun();
     });
+  }
+
+  private updateTestButtonVisibility(): void {
+    this.testPushBtn.style.display = this.gameState === 'climbing' ? 'block' : 'none';
   }
 
   private startNewRun(): void {
@@ -304,6 +326,7 @@ export class GameManager {
 
     this.shopUI.hide();
     this.gameState = 'climbing';
+    this.updateTestButtonVisibility();
 
     // Snap camera to start
     const worldPos = this.renderer.mountain.getWorldPosition(0);
@@ -348,6 +371,8 @@ export class GameManager {
 
     if (this.gameState === 'climbing') {
       this.updateClimbing(dt);
+    } else if (this.gameState === 'descending') {
+      this.updateDescending(dt);
     }
 
     requestAnimationFrame((t) => this.loop(t));
@@ -424,5 +449,72 @@ export class GameManager {
       this.checkpointSystem.getCheckpoints(),
       this.checkpointSystem.collectedThisRun,
     );
+  }
+
+  private updateDescending(dt: number): void {
+    // 以 DESCENT_ROLL_SPEED 匀速推进 height
+    this.run.logicalHeight += DESCENT_ROLL_SPEED * dt;
+
+    // 直接同步（不用 push 动画的 easing，下山是匀速滚动）
+    this.run.visualHeight = this.run.logicalHeight;
+
+    // 检查是否到达谷底平地
+    const profile = this.renderer.mountain.getTerrainProfile();
+    const valleyStart = profile.getValleyStartHeight();
+    if (this.run.logicalHeight >= valleyStart) {
+      this.run.logicalHeight = valleyStart;
+      this.run.visualHeight = valleyStart;
+      // 在平地上停下 → 进入商店
+      this.endRun();
+      return;
+    }
+
+    // 相机跟随，但锁定 zoom 到登顶时的值
+    const worldPos = this.renderer.mountain.getWorldPosition(this.run.logicalHeight);
+    this.renderer.camera.setTarget(worldPos.x, worldPos.y, this.run.logicalHeight);
+    // 覆盖目标 zoom 为登顶时的值
+    (this.renderer.camera as any).targetZoom = this.descentZoom;
+    this.renderer.camera.update(dt);
+
+    // 渲染（下山期间用 'sliding' 状态复用滑落动画）
+    this.renderer.render(
+      this.run.visualHeight,
+      'sliding',              // 复用滑落的角色动画（快速腿部摆动、身体后倾）
+      this.totalTime,
+      this.checkpointSystem.getCheckpoints(),
+      this.checkpointSystem.collectedThisRun,
+    );
+  }
+
+  /** 测试模式：模拟一次成功的推动 */
+  public testPush(): void {
+    if (this.gameState !== 'climbing') return;
+
+    const pushDist = this.getEffectivePushDistance();
+    this.run.logicalHeight += pushDist;
+    if (this.run.logicalHeight > this.run.peakHeight) {
+      this.run.peakHeight = this.run.logicalHeight;
+    }
+
+    // Start push animation
+    this.run.pushAnimFrom = this.run.visualHeight;
+    this.run.pushAnimElapsed = 0;
+    this.run.isPushAnimating = true;
+
+    this.run.pushSuccess++;
+
+    // Reset slide timer
+    this.slideSystem.onAttempt();
+    this.slideSystem.onSuccess();
+
+    // Check checkpoints
+    this.checkpointSystem.checkProgress(
+      this.run.logicalHeight,
+      this.persistent,
+      this.run.runEarnings,
+    );
+
+    // Check summit
+    this.checkSummit();
   }
 }

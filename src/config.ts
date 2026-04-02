@@ -35,6 +35,14 @@ export const SWEAT_SLIDE_SPEED = 10;               // game units/s
 export const SLIDE_INITIAL_SPEED = 40;             // game units/s
 export const SLIDE_MAX_SPEED = 400;                // game units/s
 
+// --- Descent ---
+export const DESCENT_SLOPE_ANGLE = 60;        // 下山坡度（度）
+export const SUMMIT_FLAT_LENGTH = 20;         // 山顶小平台长度（game units），让山顶不是刀尖
+export const VALLEY_FLAT_LENGTH = 5000;       // 山谷平地长度（game units）增加到5000
+export const DESCENT_ROLL_SPEED = 800;        // 下山滚动速度（game units/s）— 比失败滑落快 2x
+                                               // 对比: SLIDE_MAX_SPEED = 400
+export const BASE_FLAT_LENGTH = 100;          // 起点平地长度（game units）
+
 // --- Push ---
 export const PUSH_DISTANCE_BASE = 40;              // game units per success
 export const PUSH_ANIMATION_DURATION = 0.32;       // seconds for push easing animation

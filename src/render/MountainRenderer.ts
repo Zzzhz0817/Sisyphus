@@ -4,12 +4,15 @@ import {
   CheckpointConfig,
   MountainConfig,
   MOUNTAINS,
+  BASE_FLAT_LENGTH,
 } from '../config';
 import { degToRad, heightToSlopePosition } from '../utils/helpers';
 import { Camera } from './Camera';
+import { TerrainProfile } from '../terrain/TerrainProfile';
 
 export class MountainRenderer {
   private slopeAngleRad: number;
+  private terrainProfile: TerrainProfile;
   private clouds: { x: number; y: number; scale: number; speed: number }[];
   private stars: { x: number; y: number; size: number; alpha: number }[];
 
@@ -22,6 +25,7 @@ export class MountainRenderer {
   constructor() {
     const m = MOUNTAINS[0];
     this.slopeAngleRad = degToRad(m.slopeAngle);
+    this.terrainProfile = new TerrainProfile(m);
     this.grassColor = m.grassColor;
     this.soilColor = m.soilColor;
     this.bgColorTop = m.bgColorTop;
@@ -51,6 +55,7 @@ export class MountainRenderer {
   /** Switch visual theme to a different mountain */
   setMountain(mountain: MountainConfig): void {
     this.slopeAngleRad = degToRad(mountain.slopeAngle);
+    this.terrainProfile.setMountain(mountain);
     this.grassColor = mountain.grassColor;
     this.soilColor = mountain.soilColor;
     this.bgColorTop = mountain.bgColorTop;
@@ -78,6 +83,7 @@ export class MountainRenderer {
     this.drawParallaxLayer(ctx, camera, canvasWidth, canvasHeight, 0.35, '#5C6BC0', canvasHeight * 0.7, 80);
     this.drawClouds(ctx, camera, canvasWidth, canvasHeight, time);
     this.drawMountain(ctx, camera, canvasWidth, canvasHeight);
+    this.drawShopSign(ctx, camera, canvasWidth, canvasHeight);
     this.drawCheckpoints(ctx, camera, canvasWidth, canvasHeight, checkpoints, collectedCheckpoints, time);
   }
 
@@ -160,77 +166,201 @@ export class MountainRenderer {
 
   private drawMountain(ctx: CanvasRenderingContext2D, camera: Camera, canvasWidth: number, canvasHeight: number): void {
     const buffer = 1000;
-    const visibleWorldHeight = canvasHeight / camera.zoom;
     const visibleWorldWidth = canvasWidth / camera.zoom;
+    const visibleWorldHeight = canvasHeight / camera.zoom;
+
+    // 1. 确定可见区域在世界坐标中的范围
     const worldLeft = camera.x - visibleWorldWidth / 2 - buffer;
     const worldRight = camera.x + visibleWorldWidth / 2 + buffer;
-    const tanAngle = Math.tan(this.slopeAngleRad);
-    const leftSurfaceY = -worldLeft * tanAngle;
-    const rightSurfaceY = -worldRight * tanAngle;
-    const surfaceLeft = camera.worldToScreen(worldLeft, leftSurfaceY, canvasWidth, canvasHeight);
-    const surfaceRight = camera.worldToScreen(worldRight, rightSurfaceY, canvasWidth, canvasHeight);
-    const depth = visibleWorldHeight * 2 + buffer;
-    const pBotLeft = camera.worldToScreen(worldLeft, leftSurfaceY + depth, canvasWidth, canvasHeight);
-    const pBotRight = camera.worldToScreen(worldRight, rightSurfaceY + depth, canvasWidth, canvasHeight);
 
-    // Soil
-    const soilGradient = ctx.createLinearGradient(surfaceLeft.sx, surfaceLeft.sy, pBotLeft.sx, pBotLeft.sy);
+    // 2. 沿地形 zone 列表生成折线顶点
+    const totalLen = this.terrainProfile.getTotalLength();
+
+    // 收集地形折线的世界坐标点
+    const surfacePoints: Array<{x: number, y: number}> = [];
+    const step = 30;  // 每 30 game units 采样一个点
+    
+    // 从-3*BASE_FLAT_LENGTH开始采样，以在玩家身后绘制平地（延长三倍）
+    const startHeight = -3 * BASE_FLAT_LENGTH;
+    for (let h = startHeight; h <= totalLen; h += step) {
+      let wp: {x: number, y: number};
+      if (h < 0) {
+        // 对于负高度，使用base区域的坐标（平地，y=0）
+        wp = { x: h, y: 0 }; // 平地，y坐标为0
+      } else {
+        wp = this.terrainProfile.getWorldPosition(h);
+      }
+      surfacePoints.push(wp);
+    }
+    // 确保最后一个点
+    surfacePoints.push(this.terrainProfile.getWorldPosition(totalLen));
+
+    // 3. 只保留可见范围内的点（带 buffer）
+    const visibleSurfacePoints = surfacePoints.filter(
+      p => p.x >= worldLeft && p.x <= worldRight
+    );
+
+    // 4. 转为屏幕坐标
+    const screenPoints = visibleSurfacePoints.map(
+      p => camera.worldToScreen(p.x, p.y, canvasWidth, canvasHeight)
+    );
+
+    // 5. 绘制
+    if (screenPoints.length < 2) return;
+
+    // 土壤填充
+    const depth = visibleWorldHeight * 2 + buffer;
+    const soilGradient = ctx.createLinearGradient(
+      screenPoints[0].sx, screenPoints[0].sy,
+      screenPoints[0].sx, screenPoints[0].sy + depth * camera.zoom
+    );
     soilGradient.addColorStop(0, this.soilColor);
     soilGradient.addColorStop(1, '#3E2723');
+
     ctx.fillStyle = soilGradient;
     ctx.beginPath();
-    ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy);
-    ctx.lineTo(pBotRight.sx, pBotRight.sy);
-    ctx.lineTo(pBotLeft.sx, pBotLeft.sy);
+    // 沿折线走上边
+    ctx.moveTo(screenPoints[0].sx, screenPoints[0].sy);
+    for (let i = 1; i < screenPoints.length; i++) {
+      ctx.lineTo(screenPoints[i].sx, screenPoints[i].sy);
+    }
+    // 走下边（屏幕底部以下）
+    const last = screenPoints[screenPoints.length - 1];
+    const first = screenPoints[0];
+    ctx.lineTo(last.sx, last.sy + depth * camera.zoom);
+    ctx.lineTo(first.sx, first.sy + depth * camera.zoom);
     ctx.closePath();
     ctx.fill();
 
-    // Stripes
+    // 条纹
     ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.beginPath();
-    ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy + 100 * camera.zoom);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy + 100 * camera.zoom);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy + 150 * camera.zoom);
-    ctx.lineTo(surfaceLeft.sx, surfaceLeft.sy + 150 * camera.zoom);
-    ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy + 300 * camera.zoom);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy + 300 * camera.zoom);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy + 320 * camera.zoom);
-    ctx.lineTo(surfaceLeft.sx, surfaceLeft.sy + 320 * camera.zoom);
-    ctx.fill();
-
-    // Grass
-    const grassThickness = 28 * camera.zoom;
-    const xOff = grassThickness * Math.sin(this.slopeAngleRad);
-    const yOff = grassThickness * Math.cos(this.slopeAngleRad);
-    ctx.fillStyle = this.grassColor;
-    ctx.beginPath();
-    ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy);
-    ctx.lineTo(surfaceRight.sx + xOff, surfaceRight.sy + yOff);
-    ctx.lineTo(surfaceLeft.sx + xOff, surfaceLeft.sy + yOff);
+    for (let i = 0; i < screenPoints.length; i++) {
+      const p = screenPoints[i];
+      if (i === 0) {
+        ctx.moveTo(p.sx, p.sy + 100 * camera.zoom);
+      } else {
+        ctx.lineTo(p.sx, p.sy + 100 * camera.zoom);
+      }
+    }
+    for (let i = screenPoints.length - 1; i >= 0; i--) {
+      const p = screenPoints[i];
+      ctx.lineTo(p.sx, p.sy + 150 * camera.zoom);
+    }
     ctx.closePath();
     ctx.fill();
 
+    ctx.beginPath();
+    for (let i = 0; i < screenPoints.length; i++) {
+      const p = screenPoints[i];
+      if (i === 0) {
+        ctx.moveTo(p.sx, p.sy + 300 * camera.zoom);
+      } else {
+        ctx.lineTo(p.sx, p.sy + 300 * camera.zoom);
+      }
+    }
+    for (let i = screenPoints.length - 1; i >= 0; i--) {
+      const p = screenPoints[i];
+      ctx.lineTo(p.sx, p.sy + 320 * camera.zoom);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // 草皮层
+    const grassThickness = 28 * camera.zoom;
+    ctx.fillStyle = this.grassColor;
+    ctx.beginPath();
+    for (let i = 0; i < screenPoints.length; i++) {
+      const p = screenPoints[i];
+      if (i === 0) {
+        ctx.moveTo(p.sx, p.sy);
+      } else {
+        ctx.lineTo(p.sx, p.sy);
+      }
+    }
+    // 反向走下边
+    for (let i = screenPoints.length - 1; i >= 0; i--) {
+      const p = screenPoints[i];
+      // 计算草皮偏移（根据当前点的斜率）
+      const h = Math.min(i * step, totalLen);
+      const slopeRad = this.terrainProfile.getSlopeRad(h);
+      const xOff = grassThickness * Math.sin(slopeRad);
+      const yOff = grassThickness * Math.cos(slopeRad);
+      ctx.lineTo(p.sx + xOff, p.sy + yOff);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // 高亮线
     ctx.strokeStyle = '#B2FF59';
     ctx.lineWidth = 6 * camera.zoom;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(surfaceLeft.sx, surfaceLeft.sy);
-    ctx.lineTo(surfaceRight.sx, surfaceRight.sy);
+    for (let i = 0; i < screenPoints.length; i++) {
+      const p = screenPoints[i];
+      if (i === 0) {
+        ctx.moveTo(p.sx, p.sy);
+      } else {
+        ctx.lineTo(p.sx, p.sy);
+      }
+    }
     ctx.stroke();
 
+    // 草皮下边缘线
     ctx.strokeStyle = 'rgba(51, 105, 30, 0.4)';
     ctx.lineWidth = 4 * camera.zoom;
     ctx.beginPath();
-    ctx.moveTo(surfaceLeft.sx + xOff, surfaceLeft.sy + yOff);
-    ctx.lineTo(surfaceRight.sx + xOff, surfaceRight.sy + yOff);
+    for (let i = 0; i < screenPoints.length; i++) {
+      const p = screenPoints[i];
+      const h = Math.min(i * step, totalLen);
+      const slopeRad = this.terrainProfile.getSlopeRad(h);
+      const xOff = grassThickness * Math.sin(slopeRad);
+      const yOff = grassThickness * Math.cos(slopeRad);
+      if (i === 0) {
+        ctx.moveTo(p.sx + xOff, p.sy + yOff);
+      } else {
+        ctx.lineTo(p.sx + xOff, p.sy + yOff);
+      }
+    }
     ctx.stroke();
+  }
+
+  private drawShopSign(ctx: CanvasRenderingContext2D, camera: Camera, canvasW: number, canvasH: number): void {
+    const valleyStart = this.terrainProfile.getValleyStartHeight();
+    const signWorldPos = this.terrainProfile.getWorldPosition(valleyStart + 60); // 平地上偏右一点
+
+    const screen = camera.worldToScreen(signWorldPos.x, signWorldPos.y, canvasW, canvasH);
+
+    const postW = 6 * camera.zoom;
+    const postH = 50 * camera.zoom;
+    const signW = 60 * camera.zoom;
+    const signH = 30 * camera.zoom;
+
+    // 木桩
+    ctx.fillStyle = '#5D4037';
+    ctx.fillRect(screen.sx - postW / 2, screen.sy - postH, postW, postH);
+
+    // 招牌板
+    ctx.fillStyle = '#8D6E63';
+    ctx.fillRect(screen.sx - signW / 2, screen.sy - postH - signH, signW, signH);
+
+    // 边框
+    ctx.strokeStyle = '#4E342E';
+    ctx.lineWidth = 2 * camera.zoom;
+    ctx.strokeRect(screen.sx - signW / 2, screen.sy - postH - signH, signW, signH);
+
+    // 文字 "SHOP"
+    ctx.fillStyle = '#FFD740';
+    ctx.font = `bold ${14 * camera.zoom}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SHOP', screen.sx, screen.sy - postH - signH / 2);
   }
 
   private drawCheckpoints(ctx: CanvasRenderingContext2D, camera: Camera, canvasWidth: number, canvasHeight: number, checkpoints: CheckpointConfig[], collectedCheckpoints: number[], time: number): void {
     for (let i = 0; i < checkpoints.length; i++) {
       const cp = checkpoints[i];
-      const pos = heightToSlopePosition(cp.height, this.slopeAngleRad);
+      const pos = this.terrainProfile.getWorldPosition(cp.height);
       const screen = camera.worldToScreen(pos.x, pos.y, canvasWidth, canvasHeight);
       const collected = collectedCheckpoints.includes(i);
       const floatOffset = Math.sin(time * 4 + i) * 6 * camera.zoom;
@@ -381,6 +511,11 @@ export class MountainRenderer {
 
   /** Get world position for a given height along the slope */
   getWorldPosition(height: number): { x: number; y: number } {
-    return heightToSlopePosition(height, this.slopeAngleRad);
+    return this.terrainProfile.getWorldPosition(height);
+  }
+
+  /** 返回 TerrainProfile 供外部查询 */
+  getTerrainProfile(): TerrainProfile {
+    return this.terrainProfile;
   }
 }

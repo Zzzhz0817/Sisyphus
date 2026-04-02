@@ -51,13 +51,14 @@ export class Renderer {
     const h = this.height;
 
     const worldPos = this.mountain.getWorldPosition(currentHeight);
+    const slopeRad = this.mountain.getTerrainProfile().getSlopeRad(currentHeight);
 
     this.camera.setTarget(worldPos.x, worldPos.y, currentHeight);
 
     this.ctx.save();
 
     this.mountain.render(this.ctx, this.camera, w, h, checkpoints, collectedCheckpoints, time);
-    this.character.render(this.ctx, this.camera, worldPos.x, worldPos.y, w, h, slideState, time);
+    this.character.render(this.ctx, this.camera, worldPos.x, worldPos.y, w, h, slideState, time, slopeRad);
 
     this.ctx.restore();
   }
@@ -65,12 +66,14 @@ export class Renderer {
   /** Get the screen position of the character's head */
   getCharacterHeadScreen(currentHeight: number): { sx: number; sy: number } {
     const worldPos = this.mountain.getWorldPosition(currentHeight);
+    const slopeRad = this.mountain.getTerrainProfile().getSlopeRad(currentHeight);
     return this.character.getHeadScreenPosition(
       this.camera,
       worldPos.x,
       worldPos.y,
       this.width,
       this.height,
+      slopeRad,
     );
   }
 }
