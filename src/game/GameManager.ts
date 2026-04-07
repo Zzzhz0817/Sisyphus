@@ -13,7 +13,7 @@ import {
   getEffectiveStats,
   EffectiveStats,
 } from '../player/PlayerState';
-import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION, DUAL_PUSH_STAMINA_DISCOUNT, CRIT_MULTIPLIER, DESCENT_ROLL_SPEED } from '../config';
+import { PUSH_ANIMATION_DURATION, MOUNTAINS, MountainConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION, DUAL_PUSH_STAMINA_DISCOUNT, CRIT_MULTIPLIER, DESCENT_ROLL_SPEED, WEDGE_DELAY_MULTIPLIER, BLESSING_CHANCE, BLESSING_BAR_COLOR, DUAL_PUSH_BONUS_POINTER_COLOR } from '../config';
 import { lerp } from '../utils/helpers';
 
 export type GameState = 'climbing' | 'descending' | 'shop';
@@ -26,13 +26,16 @@ interface RunState {
   pushAnimFrom: number;
   pushAnimElapsed: number;
   isPushAnimating: boolean;
-  isWedgeActive: boolean;
   runEarnings: { obol: number; ingot: number };
   peakHeight: number;
   pushSuccess: number;
   pushFail: number;
   /** Index of the mountain being climbed this run */
   currentMountainIndex: number;
+  currentPushResult: 'success' | 'crit' | 'fail' | null;
+  currentPushBlessed: boolean;
+  currentPushDual: boolean;
+  currentPushDistance: number;
 }
 
 /** Cubic ease-out: fast at start, decelerates to rest — feels like a strong push. */
@@ -56,7 +59,6 @@ export class GameManager {
   private run: RunState;
   private gameState: GameState = 'shop';
   private descentZoom = 0;
-  private testPushBtn: HTMLElement;
 
   private lastTime = 0;
   private totalTime = 0;
@@ -85,8 +87,6 @@ export class GameManager {
     this.run = this.createRunState(0);
 
     // 初始化测试按钮
-    this.testPushBtn = document.getElementById('test-push-btn')!;
-    this.testPushBtn.addEventListener('click', () => this.testPush());
 
     this.setupInput();
     this.showShop();
@@ -111,6 +111,16 @@ export class GameManager {
     return this.persistent.equippedArtifacts.includes('criticalHit');
   }
 
+  /** Whether the Wedge artifact is equipped */
+  private get hasWedge(): boolean {
+    return this.persistent.equippedArtifacts.includes('wedge');
+  }
+
+  /** Whether the Wheel of Fate artifact is equipped */
+  private get hasBlessing(): boolean {
+    return this.persistent.equippedArtifacts.includes('qte');
+  }
+
   private createRunState(mountainIndex: number): RunState {
     return {
       logicalHeight: 0,
@@ -118,12 +128,15 @@ export class GameManager {
       pushAnimFrom: 0,
       pushAnimElapsed: 0,
       isPushAnimating: false,
-      isWedgeActive: false,
       runEarnings: { obol: 0, ingot: 0 },
       peakHeight: 0,
       pushSuccess: 0,
       pushFail: 0,
       currentMountainIndex: mountainIndex,
+      currentPushResult: null,
+      currentPushBlessed: false,
+      currentPushDual: false,
+      currentPushDistance: 0,
     };
   }
 
@@ -148,6 +161,11 @@ export class GameManager {
         // Set crit state on both bar and UI
         this.judgmentBar.critEnabled = this.hasCritHit;
         this.judgmentBarUI.setCritEnabled(this.hasCritHit);
+
+        // Roll for divine blessing (1/3 chance when artifact equipped)
+        const blessed = this.hasBlessing && Math.random() < BLESSING_CHANCE;
+        this.judgmentBar.blessed = blessed;
+        this.judgmentBarUI.setBlessed(blessed);
 
         this.judgmentBar.start(this.staminaSystem.getSuccessZoneWidth());
 
@@ -196,6 +214,16 @@ export class GameManager {
 
         // Track last success button for alternating detection
         this.lastSuccessButton = this.currentButton;
+
+        // Store push properties for continuous particle emission during animation
+        this.run.currentPushResult = result as 'success' | 'crit';
+        this.run.currentPushBlessed = this.judgmentBar.blessed;
+        this.run.currentPushDual = this.dualPushBonusActive;
+        this.run.currentPushDistance = pushDist;
+
+        if (result === 'crit') {
+          this.renderer.triggerFlash('#FFD700', 0.35); // Gold flash for crit
+        }
 
         // Reset slide timer
         this.slideSystem.onSuccess();
@@ -288,20 +316,15 @@ export class GameManager {
 
     // 只切状态，不调 endRun()
     this.gameState = 'descending';
-    this.updateTestButtonVisibility();
   }
 
   private showShop(): void {
     this.gameState = 'shop';
-    this.updateTestButtonVisibility();
     this.shopUI.show(this.persistent, this.run.runEarnings, () => {
       this.startNewRun();
     });
   }
 
-  private updateTestButtonVisibility(): void {
-    this.testPushBtn.style.display = this.gameState === 'climbing' ? 'block' : 'none';
-  }
 
   private startNewRun(): void {
     this.persistent.totalRuns++;
@@ -314,7 +337,7 @@ export class GameManager {
     this.staminaSystem.reset(this.stats);
     this.slideSystem.reset();
     this.checkpointSystem.reset();
-    this.checkpointSystem.setCheckpoints(mountain.checkpoints);
+    this.checkpointSystem.setCheckpoints(mountain.checkpoints, mountainIdx);
     this.judgmentBarUI.hide();
     this.mouseDown = false;
     this.currentButton = -1;
@@ -326,7 +349,6 @@ export class GameManager {
 
     this.shopUI.hide();
     this.gameState = 'climbing';
-    this.updateTestButtonVisibility();
 
     // Snap camera to start
     const worldPos = this.renderer.mountain.getWorldPosition(0);
@@ -396,7 +418,7 @@ export class GameManager {
     }
 
     // 3. Slide system (affects logical height)
-    const slideDelta = this.slideSystem.update(dt, this.run.isWedgeActive);
+    const slideDelta = this.slideSystem.update(dt, this.hasWedge ? WEDGE_DELAY_MULTIPLIER : 1.0);
     if (slideDelta !== 0) {
       this.run.logicalHeight = Math.max(0, this.run.logicalHeight + slideDelta);
       this.run.visualHeight = this.run.logicalHeight;
@@ -412,9 +434,23 @@ export class GameManager {
         this.run.logicalHeight,
         easeOutCubic(t),
       );
+      
+      // Emit particles continuously during the push animation
+      if (this.run.currentPushResult && this.run.currentPushResult !== 'fail') {
+        this.renderer.emitPushParticles(
+          this.run.visualHeight,
+          this.run.currentPushResult,
+          this.run.currentPushBlessed, 
+          this.run.currentPushDual, 
+          this.run.currentPushDistance,
+          dt
+        );
+      }
+
       if (t >= 1) {
         this.run.isPushAnimating = false;
         this.run.visualHeight = this.run.logicalHeight;
+        this.run.currentPushResult = null; // stop emitting
       }
     }
 
@@ -428,6 +464,7 @@ export class GameManager {
 
     // 6. Camera follows visual height
     this.renderer.camera.update(dt);
+    this.renderer.particles.update(dt);
 
     // 7. Checkpoint notifications
     this.checkpointSystem.update(dt);
@@ -448,6 +485,8 @@ export class GameManager {
       this.totalTime,
       this.checkpointSystem.getCheckpoints(),
       this.checkpointSystem.collectedThisRun,
+      this.checkpointSystem.getPermanentlyClaimedIngotIndices(this.persistent),
+      dt,
     );
   }
 
@@ -483,38 +522,9 @@ export class GameManager {
       this.totalTime,
       this.checkpointSystem.getCheckpoints(),
       this.checkpointSystem.collectedThisRun,
+      this.checkpointSystem.getPermanentlyClaimedIngotIndices(this.persistent),
+      dt,
     );
   }
 
-  /** 测试模式：模拟一次成功的推动 */
-  public testPush(): void {
-    if (this.gameState !== 'climbing') return;
-
-    const pushDist = this.getEffectivePushDistance();
-    this.run.logicalHeight += pushDist;
-    if (this.run.logicalHeight > this.run.peakHeight) {
-      this.run.peakHeight = this.run.logicalHeight;
-    }
-
-    // Start push animation
-    this.run.pushAnimFrom = this.run.visualHeight;
-    this.run.pushAnimElapsed = 0;
-    this.run.isPushAnimating = true;
-
-    this.run.pushSuccess++;
-
-    // Reset slide timer
-    this.slideSystem.onAttempt();
-    this.slideSystem.onSuccess();
-
-    // Check checkpoints
-    this.checkpointSystem.checkProgress(
-      this.run.logicalHeight,
-      this.persistent,
-      this.run.runEarnings,
-    );
-
-    // Check summit
-    this.checkSummit();
-  }
 }

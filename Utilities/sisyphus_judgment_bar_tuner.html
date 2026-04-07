@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sisyphus judgment bar tuner</title>
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f5f4f0; --txt: #1a1a1a; --txt2: #6b6b6b; --txt3: #9a9a9a;
+    --border: rgba(0,0,0,0.12); --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --bg2: #2a2a2a; --txt: #e8e8e8; --txt2: #aaa; --txt3: #777;
+      --border: rgba(255,255,255,0.12);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--txt); padding: 2rem; max-width: 860px; margin: 0 auto; line-height: 1.6; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
+  .cr { display: flex; align-items: center; gap: 12px; margin: 0 0 0.85rem; }
+  .cr label { font-size: 13px; color: var(--txt2); min-width: 160px; }
+  .cr span { font-size: 13px; font-weight: 500; min-width: 48px; text-align: right; }
+  input[type=range] { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; background: var(--border); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--txt); cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--txt); cursor: pointer; border: none; }
+  .mt { background: var(--bg2); border-radius: var(--radius); padding: 0.6rem 0.9rem; }
+  .mt .l { font-size: 11px; color: var(--txt2); margin: 0 0 2px; }
+  .mt .v { font-size: 18px; font-weight: 500; margin: 0; }
+  .fm { font-size: 11px; color: var(--txt3); font-family: 'SF Mono', 'Fira Code', monospace; margin: 0.4rem 0 0; line-height: 1.5; }
+  .sep { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Sisyphus judgment bar tuner</h1>
+
+<div class="cr">
+  <label>Max stamina (S_max)</label>
+  <input type="range" min="50" max="500" step="10" value="100" id="s-smax">
+  <span id="o-smax">100</span>
+</div>
+<div class="cr">
+  <label>Cost per push</label>
+  <input type="range" min="5" max="50" step="1" value="10" id="s-cost">
+  <span id="o-cost">10</span>
+</div>
+
+<hr class="sep">
+
+<div class="cr">
+  <label>W at stamina=100 (px)</label>
+  <input type="range" min="10" max="120" step="1" value="30" id="s-w100">
+  <span id="o-w100">30</span>
+</div>
+<div class="cr">
+  <label>Bonus per extra stamina (px)</label>
+  <input type="range" min="0" max="2.0" step="0.01" value="0.15" id="s-bonus">
+  <span id="o-bonus">0.15</span>
+</div>
+<div class="cr">
+  <label>W floor (px)</label>
+  <input type="range" min="0" max="40" step="1" value="5" id="s-wfloor">
+  <span id="o-wfloor">5</span>
+</div>
+<div class="cr">
+  <label>Curve exponent</label>
+  <input type="range" min="0.5" max="6.0" step="0.1" value="1.5" id="s-exp">
+  <span id="o-exp">1.5</span>
+</div>
+
+<hr class="sep">
+
+<div class="cr">
+  <label>Player σ (ms)</label>
+  <input type="range" min="10" max="60" step="1" value="35" id="s-sigma">
+  <span id="o-sigma">35</span>
+</div>
+<div class="cr">
+  <label>Pointer speed (px/s)</label>
+  <input type="range" min="100" max="400" step="10" value="200" id="s-speed">
+  <span id="o-speed">200</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:1.2rem 0">
+  <div class="mt"><p class="l">Max pushes</p><p class="v" id="m-pushes">10</p></div>
+  <div class="mt"><p class="l">P at full stamina</p><p class="v" id="m-pfull">97%</p></div>
+  <div class="mt"><p class="l">P at last push</p><p class="v" id="m-plast">26%</p></div>
+  <div class="mt"><p class="l">Expected successes</p><p class="v" id="m-exp">6.2</p></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 1rem">
+  <div class="mt"><p class="l">W at S_max</p><p class="v" id="m-wtop">30 px</p></div>
+  <div class="mt"><p class="l">W at S=100</p><p class="v" id="m-w100">30 px</p></div>
+  <div class="mt"><p class="l">W at last push</p><p class="v" id="m-wlast">5.2 px</p></div>
+</div>
+
+<p class="fm" id="fm-display"></p>
+
+<div style="display:flex;flex-wrap:wrap;gap:16px;margin:1.2rem 0 6px;font-size:12px;color:var(--txt2)">
+  <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#7F77DD"></span>Success rate %</span>
+  <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75"></span>Zone width (px)</span>
+  <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#D85A30"></span>Stamina</span>
+  <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:3px;background:#7F77DD;opacity:0.35"></span>S=100 reference</span>
+</div>
+
+<div style="position:relative;width:100%;height:400px">
+  <canvas id="mainChart"></canvas>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+var isDk=matchMedia('(prefers-color-scheme:dark)').matches;
+var gridC=isDk?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
+var txtC=isDk?'rgba(255,255,255,0.6)':'rgba(0,0,0,0.5)';
+
+function normalCDF(z){
+  var a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  var s=z<0?-1:1;z=Math.abs(z)/Math.sqrt(2);
+  var t=1/(1+p*z);
+  var y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-z*z);
+  return 0.5*(1+s*y);
+}
+
+function pFromW(W,V,sig){
+  if(W<=0)return 0;
+  return 2*normalCDF(W/(2*V*sig))-1;
+}
+
+function calcW(S,Smax,w100,bonus,wFloor,exp){
+  if(S<=0)return 0;
+  var baseRange=w100-wFloor;
+  var extraRange=bonus*Math.max(0,Smax-100);
+  var totalRange=Math.min(baseRange+extraRange,290);
+  return wFloor+totalRange*Math.pow(S/Smax,exp);
+}
+
+var chart=new Chart(document.getElementById('mainChart'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'P',data:[],borderColor:'#7F77DD',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#7F77DD',pointBorderColor:isDk?'#1a1a1a':'#fff',pointBorderWidth:2,yAxisID:'yP',tension:0.3},
+    {label:'W',data:[],borderColor:'#1D9E75',borderWidth:2,pointRadius:3,pointBackgroundColor:'#1D9E75',pointBorderColor:isDk?'#1a1a1a':'#fff',pointBorderWidth:2,yAxisID:'yW',borderDash:[6,3],tension:0.3},
+    {label:'S',data:[],borderColor:'#D85A30',borderWidth:2,pointRadius:3,pointBackgroundColor:'#D85A30',pointBorderColor:isDk?'#1a1a1a':'#fff',pointBorderWidth:2,yAxisID:'yS',borderDash:[2,2],tension:0}
+  ]},
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:function(c){
+        if(c.datasetIndex===0)return 'P = '+Math.round(c.parsed.y)+'%';
+        if(c.datasetIndex===1)return 'W = '+c.parsed.y.toFixed(1)+' px';
+        return 'S = '+Math.round(c.parsed.y);
+      }}}
+    },
+    scales:{
+      x:{title:{display:true,text:'Push #',color:txtC,font:{size:13}},ticks:{color:txtC,autoSkip:true,maxTicksLimit:25},grid:{color:gridC}},
+      yP:{type:'linear',position:'left',min:0,max:105,title:{display:true,text:'Success rate %',color:'#7F77DD',font:{size:12}},ticks:{color:'#7F77DD',callback:function(v){return v+'%'}},grid:{color:gridC}},
+      yW:{type:'linear',position:'right',min:0,title:{display:true,text:'Zone width (px)',color:'#1D9E75',font:{size:12}},ticks:{color:'#1D9E75'},grid:{drawOnChartArea:false}},
+      yS:{type:'linear',position:'right',min:0,title:{display:false},ticks:{display:false},grid:{drawOnChartArea:false}}
+    }
+  },
+  plugins:[{
+    afterDraw:function(ch){
+      var Smax=+document.getElementById('s-smax').value;
+      if(Smax<=100)return;
+      var cost=+document.getElementById('s-cost').value;
+      var pushAt100=Math.round((Smax-100)/cost);
+      if(pushAt100<0||pushAt100>=ch.data.labels.length)return;
+      var meta=ch.getDatasetMeta(0);
+      if(!meta.data[pushAt100])return;
+      var xPx=meta.data[pushAt100].x;
+      var ctx=ch.ctx;
+      ctx.save();
+      ctx.strokeStyle='rgba(127,119,221,0.3)';
+      ctx.lineWidth=1;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(xPx,ch.scales.yP.top);
+      ctx.lineTo(xPx,ch.scales.yP.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=isDk?'rgba(255,255,255,0.4)':'rgba(0,0,0,0.35)';
+      ctx.font='11px sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('S=100',xPx,ch.scales.yP.top-4);
+      ctx.restore();
+    }
+  }]
+});
+
+function update(){
+  var Smax=+document.getElementById('s-smax').value;
+  var cost=+document.getElementById('s-cost').value;
+  var w100=+document.getElementById('s-w100').value;
+  var bonus=+document.getElementById('s-bonus').value;
+  var wFloor=+document.getElementById('s-wfloor').value;
+  var exp=+document.getElementById('s-exp').value;
+  var sigma=+document.getElementById('s-sigma').value/1000;
+  var V=+document.getElementById('s-speed').value;
+
+  document.getElementById('o-smax').textContent=Smax;
+  document.getElementById('o-cost').textContent=cost;
+  document.getElementById('o-w100').textContent=w100;
+  document.getElementById('o-bonus').textContent=bonus.toFixed(2);
+  document.getElementById('o-wfloor').textContent=wFloor;
+  document.getElementById('o-exp').textContent=exp.toFixed(1);
+  document.getElementById('o-sigma').textContent=Math.round(sigma*1000);
+  document.getElementById('o-speed').textContent=V;
+
+  var maxPushes=Math.floor(Smax/cost);
+  if(maxPushes<1)maxPushes=1;
+  if(maxPushes>100)maxPushes=100;
+
+  var labels=[],pData=[],wData=[],sData=[];
+  var expSucc=0;
+  var wAtSmax=0,wAt100=0,wAtLast=0;
+
+  for(var i=0;i<maxPushes;i++){
+    var S=Smax-i*cost;
+    var W=calcW(S,Smax,w100,bonus,wFloor,exp);
+    var P=pFromW(W,V,sigma);
+    labels.push(i+1);
+    pData.push(Math.round(P*1000)/10);
+    wData.push(Math.round(W*10)/10);
+    sData.push(S);
+    expSucc+=P;
+    if(i===0)wAtSmax=W;
+    if(Math.abs(S-100)<cost/2)wAt100=W;
+    wAtLast=W;
+  }
+
+  if(Smax<=100)wAt100=wAtSmax;
+
+  document.getElementById('m-pushes').textContent=maxPushes;
+  document.getElementById('m-pfull').textContent=Math.round(pData[0])+'%';
+  document.getElementById('m-plast').textContent=Math.round(pData[pData.length-1])+'%';
+  document.getElementById('m-exp').textContent=expSucc.toFixed(1);
+  document.getElementById('m-wtop').textContent=wAtSmax.toFixed(1)+' px';
+  document.getElementById('m-w100').textContent=wAt100.toFixed(1)+' px';
+  document.getElementById('m-wlast').textContent=wAtLast.toFixed(1)+' px';
+
+  var br=w100-wFloor;
+  var er=bonus;
+  document.getElementById('fm-display').textContent=
+    'W(S) = '+wFloor+' + min('+br+' + '+er.toFixed(2)+' \u00D7 (S_max \u2212 100), 290) \u00D7 (S / S_max)^'+exp.toFixed(1)+
+    '   |   P = 2\u03A6( W / (2 \u00D7 '+V+' \u00D7 '+(sigma*1000).toFixed(0)+'ms) ) \u2212 1';
+
+  chart.data.labels=labels;
+  chart.data.datasets[0].data=pData;
+  chart.data.datasets[1].data=wData;
+  chart.data.datasets[2].data=sData;
+
+  chart.options.scales.yW.max=Math.ceil(Math.max(wAtSmax,w100)*1.3/10)*10||40;
+  chart.options.scales.yS.max=Math.ceil(Smax*1.1/50)*50;
+  chart.update();
+}
+
+['s-smax','s-cost','s-w100','s-bonus','s-wfloor','s-exp','s-sigma','s-speed'].forEach(function(id){
+  document.getElementById(id).addEventListener('input',update);
+});
+update();
+</script>
+
+</body>
+</html>

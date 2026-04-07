@@ -9,13 +9,22 @@ export class CheckpointSystem {
   /** The checkpoint list for the current mountain */
   private checkpoints: CheckpointConfig[] = [];
 
+  /** Current mountain index (for persistent ingot tracking) */
+  private mountainIndex: number = 0;
+
   /** Pending notification text and timer */
   notification: string | null = null;
   notificationTimer = 0;
 
-  /** Set checkpoints for the current mountain */
-  setCheckpoints(checkpoints: CheckpointConfig[]): void {
+  /** Set checkpoints and mountain index for the current run */
+  setCheckpoints(checkpoints: CheckpointConfig[], mountainIndex: number): void {
     this.checkpoints = checkpoints;
+    this.mountainIndex = mountainIndex;
+  }
+
+  /** Return which checkpoint indices for this mountain have been permanently claimed */
+  getPermanentlyClaimedIngotIndices(persistent: PersistentState): number[] {
+    return persistent.claimedIngotCheckpoints[this.mountainIndex] ?? [];
   }
 
   /** Get current checkpoint list (for rendering) */
@@ -34,17 +43,26 @@ export class CheckpointSystem {
       const cp = this.checkpoints[i];
       if (currentHeight >= cp.height) {
         this.collectedThisRun.push(i);
-        addCurrency(persistent, cp.reward);
-        
-        if (cp.reward.obol) {
-          runEarnings.obol += cp.reward.obol;
-          // No notification for obol checkpoints as requested
-        }
-        
         if (cp.reward.ingot) {
-          runEarnings.ingot += cp.reward.ingot;
-          this.notification = `+${cp.reward.ingot} Ingot`;
-          this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
+          // Ingot checkpoints are one-time only across all runs
+          const claimed = persistent.claimedIngotCheckpoints[this.mountainIndex] ?? [];
+          if (!claimed.includes(i)) {
+            claimed.push(i);
+            persistent.claimedIngotCheckpoints[this.mountainIndex] = claimed;
+            addCurrency(persistent, { ingot: cp.reward.ingot });
+            runEarnings.ingot += cp.reward.ingot;
+            this.notification = `+${cp.reward.ingot} Ingot`;
+            this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
+          }
+          if (cp.reward.obol) {
+            addCurrency(persistent, { obol: cp.reward.obol });
+            runEarnings.obol += cp.reward.obol;
+          }
+        } else {
+          addCurrency(persistent, cp.reward);
+          if (cp.reward.obol) {
+            runEarnings.obol += cp.reward.obol;
+          }
         }
       }
     }

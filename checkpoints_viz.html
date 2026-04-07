@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sisyphus — Checkpoint Overview</title>
+<style>
+  body { background: #0d0d1a; color: #eceff1; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 24px; }
+  h1 { text-align: center; color: #FFD740; letter-spacing: 2px; font-size: 20px; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: #90A4AE; font-size: 12px; margin-bottom: 28px; }
+
+  .mountains { display: flex; gap: 48px; justify-content: center; align-items: flex-end; flex-wrap: wrap; }
+  .mountain-group { display: flex; gap: 12px; align-items: flex-end; }
+  .mountain-group-label { text-align: center; font-size: 11px; color: #546E7A; margin-bottom: 4px; }
+
+  .mountain-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .mountain-name { font-size: 12px; font-weight: bold; color: #FFD740; text-align: center; max-width: 110px; }
+  .version-tag { font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-bottom: 4px; }
+  .tag-before { background: #1a1a2e; border: 1px solid #546E7A; color: #90A4AE; }
+  .tag-after  { background: #1B3A1B; border: 1px solid #4CAF50; color: #81C784; }
+
+  .bar-wrap { position: relative; }
+  .bar-bg {
+    width: 80px;
+    border-radius: 6px 6px 0 0;
+    position: relative;
+    overflow: visible;
+  }
+
+  .cp-marker {
+    position: absolute;
+    left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+  }
+  .cp-line { position: absolute; left: 0; right: 0; height: 1px; }
+  .cp-dot {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.4);
+    left: 50%; transform: translateX(-50%);
+  }
+  .cp-label-left {
+    position: absolute;
+    right: calc(100% + 4px);
+    white-space: nowrap;
+    font-size: 10px;
+    color: #78909C;
+    transform: translateY(-50%);
+  }
+  .cp-reward-right {
+    position: absolute;
+    left: calc(100% + 4px);
+    white-space: nowrap;
+    font-size: 10px;
+    transform: translateY(-50%);
+  }
+
+  .summit-line {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: #FFD740; border-radius: 3px;
+  }
+  .summit-label {
+    position: absolute; top: -16px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px; color: #FFD740; white-space: nowrap;
+  }
+
+  .divider { width: 1px; background: #222; align-self: stretch; margin: 0 4px; }
+
+  .legend { display: flex; gap: 20px; justify-content: center; margin-top: 28px; font-size: 12px; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.4); }
+
+  table { margin: 32px auto 0; border-collapse: collapse; font-size: 12px; }
+  th { color: #FFD740; border-bottom: 1px solid #333; padding: 6px 14px; text-align: left; }
+  td { padding: 5px 14px; border-bottom: 1px solid #1a1a2e; }
+  td.ingot { color: #FFCA28; font-weight: bold; }
+  td.obol  { color: #E0E0E0; }
+  td.changed { color: #81C784; }
+  tr:hover td { background: rgba(255,255,255,0.04); }
+  .section-header td { background: #151525; color: #90A4AE; font-size: 11px; letter-spacing: 1px; padding: 4px 14px; }
+</style>
+</head>
+<body>
+<h1>⛰ CHECKPOINT OVERVIEW</h1>
+<div class="subtitle">Mountain 3 & 4：检查点间距缩短至原来 1/2（对比视图）</div>
+
+<div class="mountains" id="mountains"></div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#E0E0E0"></div> Obol（每次可领）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#FFCA28"></div> Ingot（一次性）</div>
+  <div class="legend-item"><div style="width:12px;height:2px;background:#81C784;border-radius:1px"></div> 改动后位置</div>
+</div>
+
+<table id="table">
+  <thead>
+    <tr>
+      <th>山脉</th>
+      <th>版本</th>
+      <th>检查点海拔</th>
+      <th>占山顶%</th>
+      <th>奖励</th>
+      <th>一次性?</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<script>
+const MOUNTAINS = [
+  {
+    name: 'Tartarus Hills',
+    height: 2000,
+    grassColor: '#76FF03',
+    bgColor: '#2962FF',
+    modified: false,
+    checkpoints: [
+      { height: 200,  reward: { obol: 10 } },
+      { height: 480,  reward: { obol: 25 } },
+      { height: 880,  reward: { obol: 60 } },
+      { height: 1400, reward: { obol: 100 } },
+      { height: 1800, reward: { obol: 130 } },
+      { height: 1990, reward: { ingot: 1 } },
+    ],
+    checkpointsNew: null,
+  },
+  {
+    name: 'Underworld Slope',
+    height: 5000,
+    grassColor: '#558B2F',
+    bgColor: '#1A237E',
+    modified: false,
+    checkpoints: [
+      { height: 400,  reward: { obol: 50 } },
+      { height: 1000, reward: { obol: 120 } },
+      { height: 2000, reward: { obol: 250 } },
+      { height: 3200, reward: { obol: 400 } },
+      { height: 4500, reward: { obol: 570 } },
+      { height: 4990, reward: { ingot: 3 } },
+    ],
+    checkpointsNew: null,
+  },
+  {
+    name: 'Olympus Foothills',
+    height: 12000,
+    grassColor: '#33691E',
+    bgColor: '#311B92',
+    modified: true,
+    checkpoints: [
+      { height: 800,   reward: { obol: 200 } },
+      { height: 2500,  reward: { obol: 600 } },
+      { height: 5000,  reward: { obol: 1240 } },
+      { height: 8000,  reward: { obol: 2000 } },
+      { height: 11000, reward: { obol: 2760 } },
+      { height: 11990, reward: { ingot: 3 } },
+    ],
+    checkpointsNew: [
+      { height: 400,  reward: { obol: 200 } },
+      { height: 1250, reward: { obol: 600 } },
+      { height: 2500, reward: { obol: 1240 } },
+      { height: 4000, reward: { obol: 2000 } },
+      { height: 5500, reward: { obol: 2760 } },
+      { height: 5995, reward: { ingot: 3 } },
+    ],
+  },
+  {
+    name: 'Summit of the Gods',
+    height: 24000,
+    grassColor: '#1B5E20',
+    bgColor: '#0D0D0D',
+    modified: true,
+    checkpoints: [
+      { height: 2000,  reward: { obol: 1000 } },
+      { height: 6000,  reward: { obol: 4000 } },
+      { height: 12000, reward: { obol: 12000 } },
+      { height: 18000, reward: { obol: 20000 } },
+      { height: 23000, reward: { obol: 30000 } },
+    ],
+    checkpointsNew: [
+      { height: 1000,  reward: { obol: 1000 } },
+      { height: 3000,  reward: { obol: 4000 } },
+      { height: 6000,  reward: { obol: 12000 } },
+      { height: 9000,  reward: { obol: 20000 } },
+      { height: 11500, reward: { obol: 30000 } },
+    ],
+  },
+];
+
+const BAR_HEIGHT = 380;
+const MAX_HEIGHT = Math.max(...MOUNTAINS.map(m => m.height));
+
+const container = document.getElementById('mountains');
+const tbody = document.getElementById('tbody');
+
+function buildBar(m, checkpoints, isNew, barPx, showLeftLabel, showRightLabel) {
+  const wrap = document.createElement('div');
+  wrap.className = 'bar-wrap';
+
+  const bar = document.createElement('div');
+  bar.className = 'bar-bg';
+  bar.style.height = barPx + 'px';
+  bar.style.background = `linear-gradient(to top, ${m.bgColor}, ${m.grassColor}44)`;
+  bar.style.border = `2px solid ${isNew ? '#4CAF50' : m.grassColor}`;
+  bar.style.position = 'relative';
+
+  const summitLine = document.createElement('div');
+  summitLine.className = 'summit-line';
+  const summitLbl = document.createElement('div');
+  summitLbl.className = 'summit-label';
+  summitLbl.textContent = m.height.toLocaleString() + 'm';
+  bar.appendChild(summitLine);
+  bar.appendChild(summitLbl);
+
+  checkpoints.forEach(cp => {
+    const pct = cp.height / m.height;
+    const bottomPx = Math.round(pct * barPx);
+    const isIngot = !!cp.reward.ingot;
+    const color = isIngot ? '#FFCA28' : (isNew ? '#81C784' : '#E0E0E0');
+
+    const marker = document.createElement('div');
+    marker.className = 'cp-marker';
+    marker.style.bottom = bottomPx + 'px';
+    marker.style.position = 'absolute';
+    marker.style.left = '0';
+    marker.style.right = '0';
+    marker.style.height = '1px';
+
+    const line = document.createElement('div');
+    line.className = 'cp-line';
+    line.style.background = color + (isNew ? 'cc' : '66');
+
+    const dot = document.createElement('div');
+    dot.className = 'cp-dot';
+    dot.style.background = color;
+    dot.style.top = '-4px';
+
+    marker.appendChild(line);
+    marker.appendChild(dot);
+
+    if (showLeftLabel) {
+      const lbl = document.createElement('div');
+      lbl.className = 'cp-label-left';
+      lbl.textContent = cp.height.toLocaleString() + 'm';
+      lbl.style.top = '-1px';
+      lbl.style.color = isNew ? '#81C784' : '#78909C';
+      marker.appendChild(lbl);
+    }
+    if (showRightLabel) {
+      const rew = document.createElement('div');
+      rew.className = 'cp-reward-right';
+      rew.style.color = color;
+      rew.style.top = '-1px';
+      rew.textContent = isIngot ? `🔩×${cp.reward.ingot}` : `🪙${cp.reward.obol}`;
+      marker.appendChild(rew);
+    }
+
+    bar.appendChild(marker);
+  });
+
+  wrap.appendChild(bar);
+  return wrap;
+}
+
+MOUNTAINS.forEach((m, mi) => {
+  const barPx = Math.round((m.height / MAX_HEIGHT) * BAR_HEIGHT);
+
+  const outerCol = document.createElement('div');
+  outerCol.style.display = 'flex';
+  outerCol.style.flexDirection = 'column';
+  outerCol.style.alignItems = 'center';
+  outerCol.style.gap = '6px';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'mountain-name';
+  nameEl.textContent = m.name;
+  outerCol.appendChild(nameEl);
+
+  const groupRow = document.createElement('div');
+  groupRow.style.display = 'flex';
+  groupRow.style.gap = '10px';
+  groupRow.style.alignItems = 'flex-end';
+
+  if (m.modified && m.checkpointsNew) {
+    // Before col
+    const beforeCol = document.createElement('div');
+    beforeCol.style.display = 'flex';
+    beforeCol.style.flexDirection = 'column';
+    beforeCol.style.alignItems = 'center';
+    beforeCol.style.gap = '4px';
+    const tagBefore = document.createElement('div');
+    tagBefore.className = 'version-tag tag-before';
+    tagBefore.textContent = '改动前';
+    beforeCol.appendChild(tagBefore);
+    beforeCol.appendChild(buildBar(m, m.checkpoints, false, barPx, true, false));
+    groupRow.appendChild(beforeCol);
+
+    const div = document.createElement('div');
+    div.className = 'divider';
+    groupRow.appendChild(div);
+
+    // After col
+    const afterCol = document.createElement('div');
+    afterCol.style.display = 'flex';
+    afterCol.style.flexDirection = 'column';
+    afterCol.style.alignItems = 'center';
+    afterCol.style.gap = '4px';
+    const tagAfter = document.createElement('div');
+    tagAfter.className = 'version-tag tag-after';
+    tagAfter.textContent = '改动后';
+    afterCol.appendChild(tagAfter);
+    afterCol.appendChild(buildBar(m, m.checkpointsNew, true, barPx, false, true));
+    groupRow.appendChild(afterCol);
+  } else {
+    const tagEl = document.createElement('div');
+    tagEl.className = 'version-tag tag-before';
+    tagEl.textContent = '不变';
+    const singleCol = document.createElement('div');
+    singleCol.style.display = 'flex';
+    singleCol.style.flexDirection = 'column';
+    singleCol.style.alignItems = 'center';
+    singleCol.style.gap = '4px';
+    singleCol.appendChild(tagEl);
+    singleCol.appendChild(buildBar(m, m.checkpoints, false, barPx, true, true));
+    groupRow.appendChild(singleCol);
+  }
+
+  outerCol.appendChild(groupRow);
+  container.appendChild(outerCol);
+
+  // Table rows
+  const secRow = document.createElement('tr');
+  secRow.className = 'section-header';
+  secRow.innerHTML = `<td colspan="6">${m.name} — ${m.height.toLocaleString()} m</td>`;
+  tbody.appendChild(secRow);
+
+  if (m.modified && m.checkpointsNew) {
+    m.checkpoints.forEach((cp, ci) => {
+      const cpNew = m.checkpointsNew[ci];
+      const isIngot = !!cp.reward.ingot;
+      const changed = cp.height !== cpNew.height;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td rowspan="1" style="color:#90A4AE">→ 改动山</td>
+        <td><span style="color:#78909C">前</span> → <span style="color:#81C784">后</span></td>
+        <td class="${changed ? 'changed' : ''}">${cp.height.toLocaleString()} → ${cpNew.height.toLocaleString()} m</td>
+        <td class="${changed ? 'changed' : ''}">${(cp.height/m.height*100).toFixed(1)}% → ${(cpNew.height/m.height*100).toFixed(1)}%</td>
+        <td class="${isIngot ? 'ingot' : 'obol'}">${isIngot ? '🔩 Ingot ×' + cp.reward.ingot : '🪙 Obol ×' + cp.reward.obol}</td>
+        <td style="color:${isIngot?'#FFCA28':'#546e7a'}">${isIngot ? '✅ 是' : '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } else {
+    m.checkpoints.forEach(cp => {
+      const isIngot = !!cp.reward.ingot;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="color:#546E7A">不变</td>
+        <td>—</td>
+        <td>${cp.height.toLocaleString()} m</td>
+        <td>${(cp.height/m.height*100).toFixed(1)}%</td>
+        <td class="${isIngot ? 'ingot' : 'obol'}">${isIngot ? '🔩 Ingot ×' + cp.reward.ingot : '🪙 Obol ×' + cp.reward.obol}</td>
+        <td style="color:${isIngot?'#FFCA28':'#546e7a'}">${isIngot ? '✅ 是' : '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+});
+</script>
+</body>
+</html>

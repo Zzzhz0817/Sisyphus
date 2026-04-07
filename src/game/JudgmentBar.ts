@@ -23,6 +23,8 @@ export class JudgmentBar {
 
   /** Whether the crit artifact is active for this attempt */
   critEnabled = false;
+  /** Whether divine blessing is active for this attempt (any timing = success) */
+  blessed = false;
 
   /**
    * Start the judgment bar (mouse down).
@@ -60,6 +62,8 @@ export class JudgmentBar {
   /** Stop the bar and judge the result (mouse up) */
   judge(successZoneWidth: number): JudgmentResult {
     this.active = false;
+
+    if (this.blessed) return 'success';
 
     if (successZoneWidth <= 0) return 'fail';
 

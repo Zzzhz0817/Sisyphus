@@ -143,11 +143,11 @@ export class ShopUI {
         if (!crafted && !canCraft) card.classList.add('unavailable');
 
         let actionText = '';
-        if (equipped) actionText = 'EQUIPPED (Click to unequip)';
-        else if (crafted) actionText = 'OWNED (Click to equip)';
+        if (equipped) actionText = 'EQUIPPED';
+        else if (crafted) actionText = 'OWNED';
         else actionText = `
           <div class="currency-icon ingot" style="transform: scale(0.8); transform-origin: center;"></div>
-          <span>${artifact.ingotCost} to Craft</span>
+          <span>${artifact.ingotCost}</span>
         `;
 
         // Map artifact ID to specific CSS icon class
@@ -166,7 +166,10 @@ export class ShopUI {
           </div>
           <div class="artifact-tooltip">
             <div class="artifact-name" style="font-size: 14px; margin-bottom: 4px;">${artifact.name}</div>
-            <div class="artifact-desc" style="margin-bottom: 0;">${artifact.description}</div>
+            <div class="artifact-desc" style="margin-bottom: 8px;">${artifact.description}</div>
+            <div style="font-size: 11px; color: ${equipped ? 'var(--fail-red)' : 'var(--success-green)'}; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">
+              ${equipped ? 'Click to Unequip' : crafted ? 'Click to Equip' : 'Click to Craft'}
+            </div>
           </div>
         `;
 
@@ -174,6 +177,9 @@ export class ShopUI {
           if (!crafted && canCraft) {
             state.ingot -= artifact.ingotCost;
             state.craftedArtifacts.push(artifact.id);
+            if (state.equippedArtifacts.length < MAX_EQUIPPED_ARTIFACTS) {
+              state.equippedArtifacts.push(artifact.id);
+            }
             this.refresh(state, runEarnings);
           } else if (crafted && !equipped) {
             if (state.equippedArtifacts.length < MAX_EQUIPPED_ARTIFACTS) {

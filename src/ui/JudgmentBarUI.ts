@@ -9,6 +9,7 @@ import {
   CRIT_ZONE_WIDTH,
   CRIT_MIN_SUCCESS_WIDTH,
   CRIT_ZONE_COLOR,
+  BLESSING_BAR_COLOR,
 } from '../config';
 
 export class JudgmentBarUI {
@@ -21,6 +22,8 @@ export class JudgmentBarUI {
 
   /** Whether the crit artifact is equipped (set each run) */
   private critEnabled = false;
+  /** Whether the current attempt is divinely blessed */
+  private blessed = false;
 
   constructor() {
     this.container = document.getElementById('judgment-bar-container')!;
@@ -34,7 +37,8 @@ export class JudgmentBarUI {
     this.bar.style.width = JUDGMENT_BAR_TOTAL_WIDTH + 'px';
     this.bar.style.height = JUDGMENT_BAR_HEIGHT + 'px';
     this.failBg.style.backgroundColor = JUDGMENT_FAIL_COLOR;
-    this.successZone.style.backgroundColor = JUDGMENT_SUCCESS_COLOR;
+    this.successZone.style.background = JUDGMENT_SUCCESS_COLOR;
+    this.successZone.style.boxShadow = `0 0 15px ${JUDGMENT_SUCCESS_COLOR}`;
     this.critZone.style.backgroundColor = CRIT_ZONE_COLOR;
     this.pointer.style.backgroundColor = JUDGMENT_POINTER_COLOR;
   }
@@ -42,6 +46,11 @@ export class JudgmentBarUI {
   /** Enable/disable the crit zone visual (call when artifact equip changes) */
   setCritEnabled(enabled: boolean): void {
     this.critEnabled = enabled;
+  }
+
+  /** Set whether this attempt is divinely blessed */
+  setBlessed(active: boolean): void {
+    this.blessed = active;
   }
 
   show(screenX: number, screenY: number): void {
@@ -52,24 +61,40 @@ export class JudgmentBarUI {
 
   hide(): void {
     this.container.style.display = 'none';
+    this.blessed = false;
+    this.failBg.style.backgroundColor = JUDGMENT_FAIL_COLOR;
   }
 
   /** Update the success zone width, its randomized position, and pointer position */
   update(successZoneWidth: number, pointerPosition: number, successZoneOffsetRatio: number): void {
-    // Success zone at randomized position within bar bounds
-    const availableSpace = JUDGMENT_BAR_TOTAL_WIDTH - successZoneWidth;
-    const successLeft = successZoneOffsetRatio * availableSpace;
-    this.successZone.style.left = successLeft + 'px';
-    this.successZone.style.width = successZoneWidth + 'px';
-
-    // Crit zone: centered within the success zone
-    if (this.critEnabled && successZoneWidth > CRIT_MIN_SUCCESS_WIDTH) {
-      const critLeft = successLeft + (successZoneWidth - CRIT_ZONE_WIDTH) / 2;
-      this.critZone.style.display = 'block';
-      this.critZone.style.left = critLeft + 'px';
-      this.critZone.style.width = CRIT_ZONE_WIDTH + 'px';
-    } else {
+    if (this.blessed) {
+      // Divine blessing: success zone covers the entire bar with a special color
+      this.failBg.style.backgroundColor = JUDGMENT_FAIL_COLOR;
+      this.successZone.style.background = 'linear-gradient(to bottom, #D1C4E9 0%, #B39DDB 40%, #4527A0 80%, #311B92 100%)';
+      this.successZone.style.boxShadow = 'none';
+      this.successZone.style.left = '0px';
+      this.successZone.style.width = JUDGMENT_BAR_TOTAL_WIDTH + 'px';
       this.critZone.style.display = 'none';
+    } else {
+      this.failBg.style.backgroundColor = JUDGMENT_FAIL_COLOR;
+      this.successZone.style.background = JUDGMENT_SUCCESS_COLOR;
+      this.successZone.style.boxShadow = `0 0 15px ${JUDGMENT_SUCCESS_COLOR}`;
+
+      // Success zone at randomized position within bar bounds
+      const availableSpace = JUDGMENT_BAR_TOTAL_WIDTH - successZoneWidth;
+      const successLeft = successZoneOffsetRatio * availableSpace;
+      this.successZone.style.left = successLeft + 'px';
+      this.successZone.style.width = successZoneWidth + 'px';
+
+      // Crit zone: centered within the success zone
+      if (this.critEnabled && successZoneWidth > CRIT_MIN_SUCCESS_WIDTH) {
+        const critLeft = successLeft + (successZoneWidth - CRIT_ZONE_WIDTH) / 2;
+        this.critZone.style.display = 'block';
+        this.critZone.style.left = critLeft + 'px';
+        this.critZone.style.width = CRIT_ZONE_WIDTH + 'px';
+      } else {
+        this.critZone.style.display = 'none';
+      }
     }
 
     // Pointer position (0-1 normalized); transform: translateX(-50%) in CSS centers it

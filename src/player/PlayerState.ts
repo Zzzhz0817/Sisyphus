@@ -26,6 +26,8 @@ export interface PersistentState {
   mountainsUnlocked: boolean[];   // which mountains are accessible
   mountainsSummited: boolean[];   // which mountains have been summited (for one-time ingot)
   selectedMountainIndex: number;  // which mountain to climb next
+  // Ingot checkpoints that have been permanently claimed (mountainIndex -> checkpointIndex[])
+  claimedIngotCheckpoints: Record<number, number[]>;
 }
 
 /** Derived stats computed from upgrades */
@@ -37,9 +39,10 @@ export interface EffectiveStats {
 }
 
 export function createInitialPersistentState(): PersistentState {
+  const CHEAT_MODE = false; // 作弊模式：开局满资源+全山脉解锁
   return {
-    obol: 0,
-    ingot: 0,
+    obol: CHEAT_MODE ? 100000 : 0,
+    ingot: CHEAT_MODE ? 10 : 0,
     upgradeLevels: {},
     craftedArtifacts: [],
     equippedArtifacts: [],
@@ -47,9 +50,10 @@ export function createInitialPersistentState(): PersistentState {
     highestEver: 0,
     totalRuns: 0,
     runHistory: [],
-    mountainsUnlocked: [true, false, false, false],
+    mountainsUnlocked: CHEAT_MODE ? [true, true, true, true] : [true, false, false, false],
     mountainsSummited: [false, false, false, false],
     selectedMountainIndex: 0,
+    claimedIngotCheckpoints: {},
   };
 }
 
@@ -65,9 +69,16 @@ function getUpgradeEffect(upgradeId: string, persistent: PersistentState): numbe
 export function getEffectiveStats(persistent: PersistentState): EffectiveStats {
   const pushLevel = persistent.upgradeLevels['pushDistance'] ?? 0;
   const pushMultiplier = pushLevel > 0 ? getUpgradeEffect('pushDistance', persistent) : 1.0;
+  
+  // Calculate push distance with flat bonus for first 2 levels
+  let pushFlatBonus = 0;
+  if (pushLevel === 1) pushFlatBonus = 10;
+  else if (pushLevel === 2) pushFlatBonus = 20; // 10 per level for first 2 levels
+  
+  const pushDistance = (PUSH_DISTANCE_BASE + pushFlatBonus) * pushMultiplier;
 
   return {
-    pushDistance: PUSH_DISTANCE_BASE * pushMultiplier,
+    pushDistance,
     staminaMax: getUpgradeEffect('staminaMax', persistent) || STAMINA_MAX_BASE,
     staminaCost: getUpgradeEffect('staminaCostReduction', persistent) || STAMINA_COST_PER_SUCCESS,
     staminaRegen: getUpgradeEffect('staminaRegen', persistent) || STAMINA_REGEN_RATE_BASE,

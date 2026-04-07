@@ -70,6 +70,7 @@ export class MountainRenderer {
     checkpoints: CheckpointConfig[],
     collectedCheckpoints: number[],
     time: number,
+    permanentlyClaimedIngot: number[] = [],
   ): void {
     // 1. Sky
     const skyGradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
@@ -84,7 +85,7 @@ export class MountainRenderer {
     this.drawClouds(ctx, camera, canvasWidth, canvasHeight, time);
     this.drawMountain(ctx, camera, canvasWidth, canvasHeight);
     this.drawShopSign(ctx, camera, canvasWidth, canvasHeight);
-    this.drawCheckpoints(ctx, camera, canvasWidth, canvasHeight, checkpoints, collectedCheckpoints, time);
+    this.drawCheckpoints(ctx, camera, canvasWidth, canvasHeight, checkpoints, collectedCheckpoints, time, permanentlyClaimedIngot);
   }
 
   private drawSkyObjects(ctx: CanvasRenderingContext2D, camera: Camera, canvasWidth: number, canvasHeight: number, time: number): void {
@@ -357,12 +358,13 @@ export class MountainRenderer {
     ctx.fillText('SHOP', screen.sx, screen.sy - postH - signH / 2);
   }
 
-  private drawCheckpoints(ctx: CanvasRenderingContext2D, camera: Camera, canvasWidth: number, canvasHeight: number, checkpoints: CheckpointConfig[], collectedCheckpoints: number[], time: number): void {
+  private drawCheckpoints(ctx: CanvasRenderingContext2D, camera: Camera, canvasWidth: number, canvasHeight: number, checkpoints: CheckpointConfig[], collectedCheckpoints: number[], time: number, permanentlyClaimedIngot: number[] = []): void {
     for (let i = 0; i < checkpoints.length; i++) {
       const cp = checkpoints[i];
       const pos = this.terrainProfile.getWorldPosition(cp.height);
       const screen = camera.worldToScreen(pos.x, pos.y, canvasWidth, canvasHeight);
       const collected = collectedCheckpoints.includes(i);
+      const ingotPermanentlyClaimed = permanentlyClaimedIngot.includes(i);
       const floatOffset = Math.sin(time * 4 + i) * 6 * camera.zoom;
 
       if (cp.reward.ingot) {
@@ -396,11 +398,14 @@ export class MountainRenderer {
         ctx.fillRect(-domeRadius * 1.1, -2 * camera.zoom, domeRadius * 2.2, 10 * camera.zoom);
         ctx.restore();
 
+        // If permanently claimed, only show the empty pillar — no ingot
+        if (ingotPermanentlyClaimed) continue;
+
         const orbY = screen.sy - postHeight - postLift - r * 1.2 + floatOffset;
         const glowColor = collected ? 'rgba(144, 164, 174, 0.6)' : 'rgba(255, 213, 79, 0.7)';
         const orbColor = collected ? '#90A4AE' : '#FFCA28';
         const orbOutline = collected ? '#546E7A' : '#FFF9C4';
-        
+
         const glowGradient = ctx.createRadialGradient(screen.sx, orbY, r * 0.2, screen.sx, orbY, r * 3);
         glowGradient.addColorStop(0, glowColor);
         glowGradient.addColorStop(1, 'rgba(0,0,0,0)');
@@ -413,7 +418,7 @@ export class MountainRenderer {
         const topW = r * 0.8;
         const botW = r * 1.4;
         const h = r * 1.2;
-        
+
         ctx.fillStyle = orbColor;
         ctx.beginPath();
         ctx.moveTo(screen.sx - topW, orbY - h/2);
@@ -422,11 +427,11 @@ export class MountainRenderer {
         ctx.lineTo(screen.sx - botW, orbY + h/2);
         ctx.closePath();
         ctx.fill();
-        
+
         ctx.strokeStyle = orbOutline;
         ctx.lineWidth = 2.5 * camera.zoom;
         ctx.stroke();
-        
+
         // Inner detail for ingot
         ctx.strokeStyle = collected ? '#78909C' : '#FFE082';
         ctx.lineWidth = 1 * camera.zoom;

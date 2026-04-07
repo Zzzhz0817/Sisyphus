@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motivation Questionnaire</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <style>
+        .hidden { display: none !important; }
+        .radio-group input[type="radio"] {
+            display: none;
+        }
+        .radio-group label {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            border: 2px solid #cbd5e1;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .radio-group input[type="radio"]:checked + label {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+            color: white;
+        }
+        .radio-group label:hover {
+            border-color: #3b82f6;
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Container -->
+    <div class="max-w-3xl w-full bg-white rounded-xl shadow-lg p-8 transition-all duration-300">
+        
+        <!-- Step 1: Login / Setup -->
+        <div id="step-login" class="space-y-6">
+            <h1 class="text-2xl font-bold text-center mb-6" id="login-title">Motivation Questionnaire</h1>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2" id="label-subject-id">Subject ID</label>
+                <input type="text" id="subject-id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Enter your ID">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2" id="label-language">Language / 语言</label>
+                <select id="language-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="en" selected>English</option>
+                    <option value="zh">中文</option>
+                </select>
+            </div>
+
+            <button onclick="startQuestionnaire()" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition-colors" id="btn-start">Start / 下一步</button>
+        </div>
+
+        <!-- Step 2: Rating -->
+        <div id="step-rating" class="hidden space-y-8">
+            <div class="flex justify-between items-center text-sm text-gray-500 border-b pb-4">
+                <span id="progress-text">Question 1 of 21</span>
+                <div class="w-1/2 bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="min-h-[120px] flex items-center justify-center">
+                <h2 id="question-text" class="text-xl font-medium text-center leading-relaxed"></h2>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex justify-between text-sm font-semibold text-gray-600 px-2">
+                    <span id="label-intrinsic">Intrinsic Motivation<br>(Internal)</span>
+                    <span id="label-extrinsic" class="text-right">Extrinsic Motivation<br>(External)</span>
+                </div>
+                
+                <div class="flex justify-between items-center radio-group px-4">
+                    <div><input type="radio" name="rating" id="r1" value="1" onchange="setTimeout(nextQuestion, 300)"><label for="r1">1</label></div>
+                    <div><input type="radio" name="rating" id="r2" value="2" onchange="setTimeout(nextQuestion, 300)"><label for="r2">2</label></div>
+                    <div><input type="radio" name="rating" id="r3" value="3" onchange="setTimeout(nextQuestion, 300)"><label for="r3">3</label></div>
+                    <div><input type="radio" name="rating" id="r4" value="4" onchange="setTimeout(nextQuestion, 300)"><label for="r4">4</label></div>
+                    <div><input type="radio" name="rating" id="r5" value="5" onchange="setTimeout(nextQuestion, 300)"><label for="r5">5</label></div>
+                    <div><input type="radio" name="rating" id="r6" value="6" onchange="setTimeout(nextQuestion, 300)"><label for="r6">6</label></div>
+                    <div><input type="radio" name="rating" id="r7" value="7" onchange="setTimeout(nextQuestion, 300)"><label for="r7">7</label></div>
+                </div>
+            </div>
+
+            <div class="flex justify-between pt-6">
+                <button onclick="prevQuestion()" id="btn-prev" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 hidden">Previous</button>
+                <button onclick="nextQuestion()" id="btn-next" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 ml-auto">Next</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Sorting -->
+        <div id="step-sorting" class="hidden space-y-6">
+            <div class="text-center space-y-2">
+                <h2 class="text-2xl font-bold" id="sorting-title">Final Ranking</h2>
+                <p class="text-gray-600" id="sorting-desc">Please drag and drop the items to finalize your ranking. The items have been pre-sorted based on your ratings (Extrinsic at the top, Intrinsic at the bottom).</p>
+            </div>
+
+            <div class="flex justify-between text-sm font-bold text-gray-500 px-4">
+                <span id="sort-top-label">↑ Most Extrinsic</span>
+                <span id="sort-bottom-label">Most Intrinsic ↓</span>
+            </div>
+
+            <ul id="sortable-list" class="space-y-2 max-h-[60vh] overflow-y-auto p-2 border rounded-lg bg-gray-50">
+                <!-- Items will be injected here -->
+            </ul>
+
+            <button onclick="submitResults()" id="btn-submit" class="w-full bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition-colors">Submit</button>
+        </div>
+
+        <!-- Step 4: Complete -->
+        <div id="step-complete" class="hidden text-center space-y-6 py-8">
+            <div class="text-5xl mb-4">🎉</div>
+            <h2 class="text-2xl font-bold" id="complete-title">Thank You!</h2>
+            <p class="text-gray-600" id="complete-desc">Your responses have been recorded.</p>
+            <textarea id="result-json" class="w-full h-32 p-2 text-xs border rounded bg-gray-50 mt-4" readonly></textarea>
+            <button onclick="copyResults()" id="btn-copy" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Copy Results</button>
+        </div>
+
+    </div>
+
+    <script>
+        let items = [
+            { id: 6, zh: "我享受精准按键时机带来的节奏感与动画反馈。", en: "I enjoy the rhythm and animation feedback from precise button timing." },
+            { id: 17, zh: "我享受在绿色区域不断变窄的极限状态下，保持心流和极度专注的刺激感。", en: "I enjoy the thrill of maintaining flow and extreme focus as the green zone keeps narrowing." },
+            { id: 2, zh: "我享受掌握左右键交替律动时，那种物理协调感带来的身心愉悦。", en: "I enjoy the physical and mental pleasure of mastering the alternating left-right rhythm." },
+            { id: 10, zh: "我享受将商店的资源分配当成逻辑谜题，进行思考和计算的过程。", en: "I enjoy treating shop resource allocation as a logic puzzle, and the thinking and calculating process." },
+            { id: 7, zh: "我享受通过 Artificial Forge 打造出完全符合自己性格的攀登流派的乐趣。", en: "I enjoy the fun of creating a climbing build that perfectly matches my personality via the Artificial Forge." },
+            { id: 5, zh: "我享受因为角色不会死亡（即使跌落山底也没有生存压力）而带来的尝试新节奏或新策略的自由感。", en: "I enjoy the freedom to try new rhythms or strategies since the character cannot die and there is no survival pressure even when falling." },
+            { id: 13, zh: "我享受为了证明自己的技术，刻意追求极难的深绿色完美判定的过程。", en: "I enjoy deliberately pursuing the extremely difficult dark green perfect timing to prove my skills." },
+            { id: 14, zh: "我享受经过长期的策略规划登顶山峰，并将其视为游戏能力的终极证明。", en: "I enjoy reaching the summit after long-term strategic planning, viewing it as the ultimate proof of my gaming ability." },
+            { id: 19, zh: "我享受通过使用道具主动暂停滚落的石头，在绝境中逆转局势的成就感。", en: "I enjoy the achievement of reversing a desperate situation by actively using items to pause the rolling stone." },
+            { id: 9, zh: "我享受为了通关效率而追逐商店购买策略的最优解。", en: "I enjoy chasing the optimal shop purchasing strategy purely for clearing efficiency." },
+            { id: 4, zh: "我享受购买商店升级，仅仅是为了让接下来的推石收益数字实现数学上的最大化。", en: "I enjoy buying shop upgrades merely to mathematically maximize the revenue of subsequent stone pushing." },
+            { id: 11, zh: "我享受拼命登顶，只是为了解锁下一座更高收益的山峰。", en: "I enjoy desperately climbing just to unlock the next mountain with higher returns." },
+            { id: 16, zh: "我享受跌落谷底后继续游玩，仅仅是因为系统没有扣除金币，觉得“至少赚了点银币/金块”。", en: "I enjoy continuing to play after falling to the bottom simply because no coins were deducted, feeling 'at least I earned some silver/gold'." },
+            { id: 20, zh: "我享受单纯看着银币和金块数字不断增长而带来的快乐。", en: "I enjoy the joy of simply watching silver and gold numbers constantly grow." },
+            { id: 3, zh: "我享受后期数值爆炸、彻底碾压早期机制带来的无脑爽快感。", en: "I enjoy the mindless satisfaction from late-game stat explosions completely crushing early mechanics." },
+            { id: 8, zh: "我享受在不断重复操作与努力攀爬之后，终于登上山峰的来之不易的成就感。", en: "I enjoy the hard-won sense of achievement of finally reaching the summit after continuous repetitive operations and effort." },
+            { id: 15, zh: "我享受在没有时间限制下行动的自主性与自由性，能根据自己的节奏游玩。", en: "I enjoy the autonomy and freedom to act without time limits, playing at my own pace." },
+            { id: 18, zh: "我享受为了收益最大化而选择放弃继续推石头，以效率推动重复游玩。", en: "I enjoy choosing to give up pushing the stone to maximize revenue, letting efficiency drive repetition." }
+        ];
+
+        // Shuffle items array to randomize question order
+        for (let i = items.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [items[i], items[j]] = [items[j], items[i]];
+        }
+
+        const translations = {
+            en: {
+                loginTitle: "Motivation Questionnaire",
+                subjectId: "Subject ID",
+                language: "Language",
+                start: "Start",
+                progress: "Question {current} of {total}",
+                intrinsic: "Strongly Disagree<br><span class='text-xs font-normal'>(完全不赞同)</span>",
+                extrinsic: "Strongly Agree<br><span class='text-xs font-normal'>(完全赞同)</span>",
+                prev: "Previous",
+                next: "Next",
+                sortingTitle: "Final Ranking",
+                sortingDesc: "Please drag and drop the items to finalize your ranking. The items have been pre-sorted based on your ratings (Strongly Agree at the top, Strongly Disagree at the bottom).",
+                sortTop: "↑ Strongly Agree",
+                sortBottom: "Strongly Disagree ↓",
+                submit: "Submit",
+                completeTitle: "Thank You!",
+                completeDesc: "Your responses have been recorded.",
+                copyBtn: "Copy Results",
+                alertId: "Please enter a Subject ID.",
+                alertRating: "Please select a rating before proceeding.",
+                copied: "Copied to clipboard!"
+            },
+            zh: {
+                loginTitle: "动机问卷调查",
+                subjectId: "受试者 ID",
+                language: "语言",
+                start: "开始",
+                progress: "第 {current} 题，共 {total} 题",
+                intrinsic: "完全不赞同<br><span class='text-xs font-normal'>(Strongly Disagree)</span>",
+                extrinsic: "完全赞同<br><span class='text-xs font-normal'>(Strongly Agree)</span>",
+                prev: "上一题",
+                next: "下一题",
+                sortingTitle: "最终排序",
+                sortingDesc: "请拖动列表项进行最终排序。列表已根据您之前的打分进行了初步排序（最上方为完全赞同，最下方为完全不赞同）。",
+                sortTop: "↑ 完全赞同",
+                sortBottom: "完全不赞同 ↓",
+                submit: "提交",
+                completeTitle: "非常感谢！",
+                completeDesc: "您的回答已被记录。",
+                copyBtn: "复制结果",
+                alertId: "请输入受试者 ID。",
+                alertRating: "请先选择一个分数再继续。",
+                copied: "已复制到剪贴板！"
+            }
+        };
+
+        let currentLang = 'en';
+        let subjectId = '';
+        let currentQuestionIndex = 0;
+        let ratings = new Array(items.length).fill(null);
+        let sortableInstance = null;
+
+        // Listen to language change on login screen
+        document.getElementById('language-select').addEventListener('change', (e) => {
+            currentLang = e.target.value;
+            updateUIText();
+        });
+
+        function updateUIText() {
+            const t = translations[currentLang];
+            document.getElementById('login-title').innerText = t.loginTitle;
+            document.getElementById('label-subject-id').innerText = t.subjectId;
+            document.getElementById('label-language').innerText = t.language;
+            document.getElementById('btn-start').innerText = t.start;
+            
+            document.getElementById('label-intrinsic').innerHTML = t.intrinsic;
+            document.getElementById('label-extrinsic').innerHTML = t.extrinsic;
+            document.getElementById('btn-prev').innerText = t.prev;
+            document.getElementById('btn-next').innerText = t.next;
+            
+            document.getElementById('sorting-title').innerText = t.sortingTitle;
+            document.getElementById('sorting-desc').innerText = t.sortingDesc;
+            document.getElementById('sort-top-label').innerText = t.sortTop;
+            document.getElementById('sort-bottom-label').innerText = t.sortBottom;
+            document.getElementById('btn-submit').innerText = t.submit;
+            
+            document.getElementById('complete-title').innerText = t.completeTitle;
+            document.getElementById('complete-desc').innerText = t.completeDesc;
+            document.getElementById('btn-copy').innerText = t.copyBtn;
+        }
+
+        function startQuestionnaire() {
+            subjectId = document.getElementById('subject-id').value.trim();
+            if (!subjectId) {
+                alert(translations[currentLang].alertId);
+                return;
+            }
+            
+            document.getElementById('step-login').classList.add('hidden');
+            document.getElementById('step-rating').classList.remove('hidden');
+            
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const t = translations[currentLang];
+            const item = items[currentQuestionIndex];
+            
+            // Update Progress
+            document.getElementById('progress-text').innerText = t.progress.replace('{current}', currentQuestionIndex + 1).replace('{total}', items.length);
+            document.getElementById('progress-bar').style.width = `${((currentQuestionIndex + 1) / items.length) * 100}%`;
+            
+            // Update Text
+            document.getElementById('question-text').innerText = item[currentLang];
+            
+            // Restore rating if exists
+            const currentRating = ratings[currentQuestionIndex];
+            document.querySelectorAll('input[name="rating"]').forEach(radio => {
+                radio.checked = (radio.value == currentRating);
+            });
+
+            // Toggle Prev button
+            if (currentQuestionIndex === 0) {
+                document.getElementById('btn-prev').classList.add('hidden');
+            } else {
+                document.getElementById('btn-prev').classList.remove('hidden');
+            }
+        }
+
+        function prevQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+            }
+        }
+
+        function nextQuestion() {
+            const selected = document.querySelector('input[name="rating"]:checked');
+            if (!selected) {
+                alert(translations[currentLang].alertRating);
+                return;
+            }
+            
+            ratings[currentQuestionIndex] = parseInt(selected.value);
+            
+            if (currentQuestionIndex < items.length - 1) {
+                currentQuestionIndex++;
+                renderQuestion();
+            } else {
+                startSorting();
+            }
+        }
+
+        function startSorting() {
+            document.getElementById('step-rating').classList.add('hidden');
+            document.getElementById('step-sorting').classList.remove('hidden');
+
+            // Combine items with their ratings
+            let sortedItems = items.map((item, index) => ({
+                ...item,
+                rating: ratings[index]
+            }));
+
+            // Sort descending by rating (Extrinsic (7) at top, Intrinsic (1) at bottom)
+            sortedItems.sort((a, b) => b.rating - a.rating);
+
+            const listEl = document.getElementById('sortable-list');
+            listEl.innerHTML = '';
+
+            sortedItems.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'p-4 bg-white border rounded shadow-sm cursor-grab flex items-center gap-4 hover:bg-gray-50';
+                li.dataset.id = item.id;
+                
+                // Add a drag handle icon
+                li.innerHTML = `
+                    <div class="text-gray-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path></svg>
+                    </div>
+                    <div class="flex-1 text-sm md:text-base">${item[currentLang]}</div>
+                    <div class="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded">Score: ${item.rating}</div>
+                `;
+                listEl.appendChild(li);
+            });
+
+            if (sortableInstance) {
+                sortableInstance.destroy();
+            }
+            sortableInstance = new Sortable(listEl, {
+                animation: 150,
+                ghostClass: 'sortable-ghost'
+            });
+        }
+
+        function submitResults() {
+            const listEl = document.getElementById('sortable-list');
+            const finalOrderIds = Array.from(listEl.children).map(li => parseInt(li.dataset.id));
+            
+            const finalResults = {
+                subjectId: subjectId,
+                language: currentLang,
+                timestamp: new Date().toISOString(),
+                ratings: items.map((item, index) => ({
+                    id: item.id,
+                    rating: ratings[index]
+                })),
+                finalRanking: finalOrderIds.map((id, index) => ({
+                    rank: index + 1, // 1 is most extrinsic
+                    id: id
+                }))
+            };
+
+            document.getElementById('step-sorting').classList.add('hidden');
+            document.getElementById('step-complete').classList.remove('hidden');
+            
+            document.getElementById('result-json').value = JSON.stringify(finalResults, null, 2);
+        }
+
+        function copyResults() {
+            const jsonText = document.getElementById('result-json').value;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                const btn = document.getElementById('btn-copy');
+                const originalText = btn.innerText;
+                btn.innerText = translations[currentLang].copied;
+                btn.classList.replace('bg-blue-600', 'bg-green-600');
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.classList.replace('bg-green-600', 'bg-blue-600');
+                }, 2000);
+            });
+        }
+
+        // Initialize UI
+        updateUIText();
+    </script>
+</body>
+</html>

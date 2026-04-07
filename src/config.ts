@@ -162,7 +162,7 @@ export const CAMERA_ZOOM_RATE = 0.0005;           // slow zoom-out as height inc
 export const CAMERA_ZOOM_STEP_HEIGHT = 100;
 export const CAMERA_ZOOM_STEP_FACTOR = 0.3;
 export const CAMERA_ZOOM_MODE: 'continuous' | 'stepped' = 'continuous';
-export const CAMERA_FOLLOW_SPEED = 5.0;
+export const CAMERA_FOLLOW_SPEED = 3.5;           // Lower value = more lag/elasticity (was 5.0)
 /** Fraction of screen width where the player appears (0.25 = left quarter) */
 export const CAMERA_VIEWPORT_X = 0.25;
 /** Fraction of screen height where the player appears (0.75 = bottom quarter) */
@@ -195,31 +195,12 @@ export const DUAL_PUSH_RIGHT_COLOR = '#2196F3';
 export const DUAL_PUSH_BONUS_POINTER_COLOR = '#69F0AE';  // Mint green pointer when alternate bonus active
 export const DUAL_PUSH_STAMINA_DISCOUNT = 0.5;           // 50% stamina cost when alternating
 
-// --- Wedge (artifact-gated) ---
-export const WEDGE_KEY = 'Space';
-export const WEDGE_DURATION_BASE = 5.0;            // s
-export const WEDGE_COOLDOWN = 2.0;                 // s
-export const WEDGE_MAX_CARRY_BASE = 2;
-export const WEDGE_SHOP_COST = { obol: 30 };
+// --- Wedge (artifact-gated, passive) ---
+export const WEDGE_DELAY_MULTIPLIER = 3.0;         // slide timers ×3 when equipped
 
-// --- QTE (artifact-gated) ---
-export const QTE_DURATION = 8.0;                   // s
-export const QTE_TARGET_CLICKS = 30;
-export const QTE_PENALTY_LIMIT = 3;
-export const QTE_REWARD_MULTIPLIER_BASE = 2.0;
-export const QTE_POINTER_SPEED = 180;              // deg/s
-export const QTE_WHEEL_SEGMENTS = [
-  { type: 'safe'   as const, angleDeg: 60 },
-  { type: 'danger' as const, angleDeg: 30 },
-  { type: 'safe'   as const, angleDeg: 45 },
-  { type: 'danger' as const, angleDeg: 45 },
-  { type: 'safe'   as const, angleDeg: 90 },
-  { type: 'danger' as const, angleDeg: 30 },
-  { type: 'safe'   as const, angleDeg: 60 },
-];
-export const QTE_WHEEL_RADIUS = 120;               // px
-export const QTE_SAFE_COLOR = '#C8A96E';
-export const QTE_DANGER_COLOR = '#8B0000';
+// --- Divine Blessing (artifact-gated, passive) ---
+export const BLESSING_CHANCE = 1 / 3;              // probability per push attempt
+export const BLESSING_BAR_COLOR = '#8C9EFF';       // light blue-purple blessed bar color
 
 // --- Artifacts ---
 export interface ArtifactConfig {
@@ -231,8 +212,8 @@ export interface ArtifactConfig {
 export const ARTIFACTS: ArtifactConfig[] = [
   { id: 'criticalHit', name: "Ares' Fury",       description: 'Critical hit zone in judgment bar',          ingotCost: 1 },
   { id: 'dualPush',    name: "Heracles' Armlet",  description: 'Alternate L/R click: half stamina cost',     ingotCost: 1 },
-  { id: 'wedge',       name: "Hephaestus' Wedge", description: 'Fix boulder in place temporarily',          ingotCost: 2 },
-  { id: 'qte',         name: 'Wheel of Fate',     description: 'QTE challenge at checkpoints for 2x reward', ingotCost: 3 },
+  { id: 'wedge',       name: "Hephaestus' Wedge", description: 'Steady your footing — 3× slower to slip',    ingotCost: 2 },
+  { id: 'qte',         name: 'Wheel of Fate',     description: '1/3 chance each push is divinely blessed — any timing succeeds', ingotCost: 3 },
 ];
 export const MAX_EQUIPPED_ARTIFACTS = 3;
 
@@ -262,7 +243,7 @@ export const UPGRADES: Record<string, UpgradeConfig> = {
     description: 'Increase maximum stamina',
     maxLevel: 20,
     baseCost: { obol: 8 },
-    effectPerLevel: [100, 115, 130, 150, 175, 200, 230, 265, 305, 350, 400, 455, 515, 580, 650, 725, 810, 900, 1000, 1110],
+    effectPerLevel: [120, 150, 165, 185, 210, 235, 265, 300, 340, 385, 435, 490, 550, 615, 685, 760, 845, 935, 1035, 1145],
     prerequisite: null,
   },
   staminaCostReduction: {
