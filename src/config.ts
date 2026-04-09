@@ -95,7 +95,7 @@ export const MOUNTAINS: MountainConfig[] = [
   },
   {
     id: 1,
-    name: 'Underworld Slope',
+    name: 'Underworld Path',
     height: 5000,
     slopeAngle: 30,
     pushDistanceMultiplier: 0.5,
@@ -115,7 +115,7 @@ export const MOUNTAINS: MountainConfig[] = [
   },
   {
     id: 2,
-    name: 'Olympus Foothills',
+    name: 'Olympus Cliffs',
     height: 12000,
     slopeAngle: 35,
     pushDistanceMultiplier: 0.35,
@@ -210,12 +210,12 @@ export interface ArtifactConfig {
   ingotCost: number;
 }
 export const ARTIFACTS: ArtifactConfig[] = [
-  { id: 'criticalHit', name: "Ares' Fury",       description: 'Critical hit zone in judgment bar',          ingotCost: 1 },
-  { id: 'dualPush',    name: "Heracles' Armlet",  description: 'Alternate L/R click: half stamina cost',     ingotCost: 1 },
-  { id: 'wedge',       name: "Hephaestus' Wedge", description: 'Steady your footing — 3× slower to slip',    ingotCost: 2 },
-  { id: 'qte',         name: 'Wheel of Fate',     description: '1/3 chance each push is divinely blessed — any timing succeeds', ingotCost: 3 },
+  { id: 'criticalHit', name: "Ares' Fury",       description: 'Precise pushes can critically hit, pushing the boulder further.',                          ingotCost: 1 },
+  { id: 'dualPush',    name: "Heracles' Armlet",  description: __MOBILE__ ? 'Alternating pushes on the left and right sides of the screen significantly reduces stamina cost.' : 'Alternating left and right clicks to push significantly reduces stamina cost.', ingotCost: 1 },
+  { id: 'wedge',       name: "Hephaestus' Wedge", description: 'You stand firmer, increasing the time you can hold on before the boulder starts to slip.',  ingotCost: 2 },
+  { id: 'qte',         name: 'Wheel of Fate',     description: 'Each push has a chance to be blessed, guaranteeing a successful push.',                     ingotCost: 3 },
 ];
-export const MAX_EQUIPPED_ARTIFACTS = 3;
+export const MAX_EQUIPPED_ARTIFACTS = 4;
 
 // --- Upgrades ---
 export const UPGRADE_COST_MULTIPLIER = 1.8;
@@ -231,8 +231,8 @@ export interface UpgradeConfig {
 
 export const UPGRADES: Record<string, UpgradeConfig> = {
   pushDistance: {
-    name: 'Pushing Force',
-    description: 'Increase push distance per success',
+    name: "Titan's Might",
+    description: 'Increase distance per push',
     maxLevel: 20,
     baseCost: { obol: 5 },
     effectPerLevel: [1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 4.0, 4.8, 5.7, 6.8, 8.0, 9.4, 11.0, 12.8, 14.9, 17.3, 20.0, 23.1, 26.7],
@@ -247,15 +247,15 @@ export const UPGRADES: Record<string, UpgradeConfig> = {
     prerequisite: null,
   },
   staminaCostReduction: {
-    name: 'Stamina Saver',
-    description: 'Reduce stamina cost per success',
+    name: 'Iron Grip',
+    description: 'Reduce stamina cost per push',
     maxLevel: 10,
     baseCost: { obol: 20 },
     effectPerLevel: [5.0, 4.7, 4.4, 4.0, 3.6, 3.2, 2.8, 2.4, 2.0, 1.6],
     prerequisite: 'staminaMax:3',
   },
   staminaRegen: {
-    name: 'Second Wind',
+    name: 'Divine Breath',
     description: 'Increase stamina regen rate',
     maxLevel: 10,
     baseCost: { obol: 15 },

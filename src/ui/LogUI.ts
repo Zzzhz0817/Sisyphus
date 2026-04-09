@@ -1,4 +1,5 @@
 import { PersistentState, RunRecord } from '../player/PlayerState';
+import { ui } from '../i18n';
 
 export class LogUI {
   private overlay: HTMLElement;
@@ -11,7 +12,6 @@ export class LogUI {
     this.panel = document.getElementById('log-panel')!;
 
     document.getElementById('log-btn')!.addEventListener('click', () => this.open());
-    // log-close-btn is rendered dynamically inside render(), so its listener is attached there
     this.overlay.addEventListener('click', (e) => {
       if (e.target === this.overlay) this.close();
     });
@@ -29,8 +29,8 @@ export class LogUI {
   private render(): void {
     const state = this.getState();
     const history = state.runHistory;
+    const t = ui();
 
-    // --- Summary stats ---
     const totalRuns = state.totalRuns;
     const highestEver = Math.floor(state.highestEver);
     const avgHeight = history.length > 0
@@ -47,7 +47,6 @@ export class LogUI {
       ? Math.round((totalQteSuccess / totalQteAttempted) * 100)
       : null;
 
-    // --- Render rows (most recent first) ---
     const rows = [...history].reverse().map((r: RunRecord) => {
       const attempts = r.pushSuccess + r.pushFail;
       const hitRate = attempts > 0 ? Math.round((r.pushSuccess / attempts) * 100) : 0;
@@ -72,29 +71,29 @@ export class LogUI {
 
     this.panel.innerHTML = `
       <div id="log-header">
-        <span id="log-title">Run Log</span>
+        <span id="log-title">${t.runLog}</span>
         <button id="log-close-btn">✕</button>
       </div>
 
       <div id="log-summary">
-        <div class="log-stat"><span class="log-stat-label">Total Runs</span><span class="log-stat-value">${totalRuns}</span></div>
-        <div class="log-stat"><span class="log-stat-label">Highest Ever</span><span class="log-stat-value">${highestEver}m</span></div>
-        <div class="log-stat"><span class="log-stat-label">Avg Height</span><span class="log-stat-value">${avgHeight}m</span></div>
-        <div class="log-stat"><span class="log-stat-label">Overall Hit Rate</span><span class="log-stat-value">${overallHitRate}%</span></div>
-        <div class="log-stat"><span class="log-stat-label">QTE Success Rate</span><span class="log-stat-value">${qteRate !== null ? qteRate + '%' : 'N/A'}</span></div>
+        <div class="log-stat"><span class="log-stat-label">${t.totalRuns}</span><span class="log-stat-value">${totalRuns}</span></div>
+        <div class="log-stat"><span class="log-stat-label">${t.highestEver}</span><span class="log-stat-value">${highestEver}m</span></div>
+        <div class="log-stat"><span class="log-stat-label">${t.avgHeight}</span><span class="log-stat-value">${avgHeight}m</span></div>
+        <div class="log-stat"><span class="log-stat-label">${t.overallHitRate}</span><span class="log-stat-value">${overallHitRate}%</span></div>
+        <div class="log-stat"><span class="log-stat-label">${t.qteSuccessRate}</span><span class="log-stat-value">${qteRate !== null ? qteRate + '%' : 'N/A'}</span></div>
       </div>
 
-      ${history.length === 0 ? '<p id="log-empty">No runs recorded yet.</p>' : `
+      ${history.length === 0 ? `<p id="log-empty">${t.noRuns}</p>` : `
       <div id="log-table-wrap">
         <table id="log-table">
           <thead>
             <tr>
-              <th>Run</th>
-              <th>Height</th>
+              <th>${t.runCol}</th>
+              <th>${t.heightCol}</th>
               <th>✓</th>
               <th>✗</th>
-              <th>Hit%</th>
-              <th>Earnings</th>
+              <th>${t.hitPct}</th>
+              <th>${t.earnings}</th>
               <th>QTE</th>
             </tr>
           </thead>
@@ -103,7 +102,6 @@ export class LogUI {
       </div>`}
     `;
 
-    // Re-attach close button listener after innerHTML re-render
     document.getElementById('log-close-btn')!.addEventListener('click', () => this.close());
   }
 }

@@ -1,8 +1,11 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/si/',
+  base: '/si-m/',
   define: {
-    __MOBILE__: false,
+    __MOBILE__: true,
+  },
+  build: {
+    outDir: 'dist-mobile',
   },
 });

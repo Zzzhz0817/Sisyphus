@@ -6,6 +6,7 @@ export class HUD {
   private heightEl: HTMLElement;
   private notificationEl: HTMLElement;
   private mountainNameEl: HTMLElement | null;
+  private tutorialHintEl: HTMLElement;
   private notificationVisible = false;
 
   constructor() {
@@ -14,6 +15,7 @@ export class HUD {
     this.heightEl = document.getElementById('hud-height')!;
     this.notificationEl = document.getElementById('checkpoint-notification')!;
     this.mountainNameEl = document.getElementById('hud-mountain-name');
+    this.tutorialHintEl = document.getElementById('tutorial-hint')!;
   }
 
   setMountainName(name: string): void {
@@ -39,5 +41,14 @@ export class HUD {
     if (!this.notificationVisible) return;
     this.notificationVisible = false;
     this.notificationEl.classList.remove('show');
+  }
+
+  showTutorialHint(text: string): void {
+    this.tutorialHintEl.textContent = text;
+    this.tutorialHintEl.classList.add('show');
+  }
+
+  hideTutorialHint(): void {
+    this.tutorialHintEl.classList.remove('show');
   }
 }

@@ -2,40 +2,97 @@ import { UPGRADES, ARTIFACTS, MAX_EQUIPPED_ARTIFACTS, MOUNTAINS } from '../confi
 import { PersistentState } from '../player/PlayerState';
 import { canAfford } from '../player/CurrencyManager';
 import { getUpgradeCost, isPrerequisiteMet, purchaseUpgrade } from '../player/UpgradeManager';
+import { ui, toggleLang, getLang, getMountainName, getUpgradeName, getUpgradeDesc, getArtifactName, getArtifactDesc } from '../i18n';
 
 export class ShopUI {
   private overlay: HTMLElement;
   private upgradesContainer: HTMLElement;
   private artifactsContainer: HTMLElement;
   private artifactSection: HTMLElement;
-  private currencyBar: HTMLElement;
   private statsEl: HTMLElement;
   private departBtn: HTMLElement;
+  private titleEl: HTMLElement;
+  private upgradesTitleEl: HTMLElement;
+  private artifactsTitleEl: HTMLElement;
+  private langBtn: HTMLButtonElement;
 
   private onDepart: (() => void) | null = null;
+  private currentState: PersistentState | null = null;
+  private currentEarnings: { obol: number; ingot: number } | null = null;
 
   constructor() {
     this.overlay = document.getElementById('shop-overlay')!;
     this.upgradesContainer = document.getElementById('shop-upgrades')!;
     this.artifactsContainer = document.getElementById('shop-artifacts')!;
     this.artifactSection = document.getElementById('shop-artifact-section')!;
-    this.currencyBar = document.createElement('div');
     this.statsEl = document.getElementById('shop-stats')!;
     this.departBtn = document.getElementById('shop-depart-btn')!;
+    this.titleEl = document.getElementById('shop-title')!;
+    this.upgradesTitleEl = document.getElementById('shop-upgrades-title')!;
+    this.artifactsTitleEl = document.getElementById('shop-artifacts-title')!;
 
     this.departBtn.addEventListener('click', () => {
       if (this.onDepart) this.onDepart();
     });
+
+    // Language toggle button (top-right of shop overlay)
+    this.langBtn = document.createElement('button');
+    this.langBtn.id = 'lang-toggle-btn';
+    this.langBtn.textContent = ui().langBtn;
+    this.langBtn.style.cssText = [
+      'position:fixed',
+      'top:16px',
+      'right:20px',
+      'z-index:1000',
+      'padding:6px 14px',
+      'background:rgba(255,255,255,0.08)',
+      'border:1px solid rgba(255,255,255,0.25)',
+      'border-radius:6px',
+      'color:#fff',
+      'font-size:13px',
+      'font-family:var(--font-body,sans-serif)',
+      'letter-spacing:1px',
+      'cursor:pointer',
+      'transition:background 0.2s',
+    ].join(';');
+    this.langBtn.addEventListener('mouseenter', () => {
+      this.langBtn.style.background = 'rgba(255,255,255,0.18)';
+    });
+    this.langBtn.addEventListener('mouseleave', () => {
+      this.langBtn.style.background = 'rgba(255,255,255,0.08)';
+    });
+    this.langBtn.addEventListener('click', () => {
+      toggleLang();
+      this.langBtn.textContent = ui().langBtn;
+      if (this.currentState && this.currentEarnings) {
+        this.updateStaticText();
+        this.refresh(this.currentState, this.currentEarnings);
+      }
+    });
+    this.overlay.appendChild(this.langBtn);
   }
 
   show(state: PersistentState, runEarnings: { obol: number; ingot: number }, onDepart: () => void): void {
     this.onDepart = onDepart;
+    this.currentState = state;
+    this.currentEarnings = runEarnings;
     this.overlay.style.display = 'block';
+    this.overlay.scrollTop = 0;
+    this.langBtn.style.display = 'block';
+    this.updateStaticText();
+    this.departBtn.textContent = state.totalRuns === 0 ? ui().startClimbing : ui().climbAgain;
     this.refresh(state, runEarnings);
   }
 
   hide(): void {
     this.overlay.style.display = 'none';
+    this.langBtn.style.display = 'none';
+  }
+
+  private updateStaticText(): void {
+    this.titleEl.textContent = ui().shopTitle;
+    this.upgradesTitleEl.textContent = ui().upgrades;
+    this.artifactsTitleEl.textContent = ui().artifactForge;
   }
 
   private refresh(state: PersistentState, runEarnings: { obol: number; ingot: number }): void {
@@ -66,6 +123,9 @@ export class ShopUI {
       const affordable = canAfford(state, cost);
       const locked = !prereqMet;
 
+      const localName = getUpgradeName(id, config.name);
+      const localDesc = getUpgradeDesc(id, config.description);
+
       const card = document.createElement('div');
       card.className = 'upgrade-card';
       if (locked) card.classList.add('locked');
@@ -80,14 +140,15 @@ export class ShopUI {
       }
 
       let statusText = '';
-      if (maxed) statusText = '<span style="color:#4caf50">MAXED</span>';
+      if (maxed) statusText = `<span style="color:#4caf50">${ui().maxed}</span>`;
       else if (locked) {
         if (config.prerequisite) {
           const [pid, plvl] = config.prerequisite.split(':');
           const pConfig = UPGRADES[pid];
-          statusText = `<span style="font-size: 12px;">Requires ${pConfig?.name ?? pid} Lv${plvl}</span>`;
+          const prereqLocalName = getUpgradeName(pid, pConfig?.name ?? pid);
+          statusText = `<span style="font-size: 12px;">${ui().requires(prereqLocalName, plvl)}</span>`;
         } else {
-          statusText = 'Locked';
+          statusText = ui().locked;
         }
       } else {
         statusText = costText;
@@ -97,11 +158,11 @@ export class ShopUI {
 
       card.innerHTML = `
         <div class="pillar-top">
-          <div class="upgrade-name">${config.name}</div>
-          <div class="upgrade-level">Level ${level} / ${config.maxLevel}</div>
+          <div class="upgrade-name">${localName}</div>
+          <div class="upgrade-level">${ui().levelDisplay(level, config.maxLevel)}</div>
         </div>
         <div class="pillar-mid">
-          <div class="upgrade-desc">${config.description}</div>
+          <div class="upgrade-desc">${localDesc}</div>
           <div class="upgrade-progress-bg">
             <div class="upgrade-progress-fill" style="width: ${progressPercent}%"></div>
           </div>
@@ -136,6 +197,9 @@ export class ShopUI {
         const equipped = state.equippedArtifacts.includes(artifact.id);
         const canCraft = !crafted && state.ingot >= artifact.ingotCost;
 
+        const localName = getArtifactName(artifact.id, artifact.name);
+        const localDesc = getArtifactDesc(artifact.id, artifact.description);
+
         const card = document.createElement('div');
         card.className = 'artifact-pedestal';
         if (crafted) card.classList.add('crafted');
@@ -143,15 +207,14 @@ export class ShopUI {
         if (!crafted && !canCraft) card.classList.add('unavailable');
 
         let actionText = '';
-        if (equipped) actionText = 'EQUIPPED';
-        else if (crafted) actionText = 'OWNED';
+        if (equipped) actionText = ui().equipped;
+        else if (crafted) actionText = ui().owned;
         else actionText = `
           <div class="currency-icon ingot" style="transform: scale(0.8); transform-origin: center;"></div>
           <span>${artifact.ingotCost}</span>
         `;
 
-        // Map artifact ID to specific CSS icon class
-        let iconClass = 'art-ares'; // Default
+        let iconClass = 'art-ares';
         if (artifact.id === 'dualPush') iconClass = 'art-heracles';
         if (artifact.id === 'wedge') iconClass = 'art-hephaestus';
         if (artifact.id === 'qte') iconClass = 'art-wheel';
@@ -160,15 +223,15 @@ export class ShopUI {
           <div class="artifact-icon-container">
             <div class="art-icon ${iconClass}"></div>
           </div>
-          <div class="artifact-name">${artifact.name}</div>
+          <div class="artifact-name">${localName}</div>
           <div class="artifact-cost" style="${equipped ? 'color:var(--success-green)' : crafted ? 'color:var(--primary-gold)' : ''}">
             ${actionText}
           </div>
           <div class="artifact-tooltip">
-            <div class="artifact-name" style="font-size: 14px; margin-bottom: 4px;">${artifact.name}</div>
-            <div class="artifact-desc" style="margin-bottom: 8px;">${artifact.description}</div>
+            <div class="artifact-name" style="font-size: 14px; margin-bottom: 4px;">${localName}</div>
+            <div class="artifact-desc" style="margin-bottom: 8px;">${localDesc}</div>
             <div style="font-size: 11px; color: ${equipped ? 'var(--fail-red)' : 'var(--success-green)'}; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">
-              ${equipped ? 'Click to Unequip' : crafted ? 'Click to Equip' : 'Click to Craft'}
+              ${equipped ? ui().clickUnequip : crafted ? ui().clickEquip : ui().clickCraft}
             </div>
           </div>
         `;
@@ -201,9 +264,7 @@ export class ShopUI {
   }
 
   private renderMountainSelector(state: PersistentState, runEarnings: { obol: number; ingot: number }): void {
-    // Only show after player has summited the first mountain (index 0)
     if (!state.mountainsSummited[0]) {
-      // Hide container if it exists
       const existingContainer = document.getElementById('shop-mountain-selector');
       if (existingContainer) {
         existingContainer.style.display = 'none';
@@ -216,13 +277,12 @@ export class ShopUI {
       container = document.createElement('div');
       container.id = 'shop-mountain-selector';
       container.className = 'shop-section';
-      // Insert before the depart button
       this.departBtn.parentElement!.insertBefore(container, this.departBtn);
     }
     container.style.display = '';
 
     container.innerHTML = `
-      <h2>Choose Your Mountain</h2>
+      <h2>${ui().chooseMountain}</h2>
       <div class="mountain-track" id="mountain-options"></div>
     `;
 
@@ -238,7 +298,7 @@ export class ShopUI {
       node.className = `mountain-node ${unlocked ? '' : 'locked'} ${selected ? 'selected' : ''}`;
 
       const multiplierColor = m.pushDistanceMultiplier < 1 ? 'var(--fail-red)' : 'var(--success-green)';
-      
+
       let markerHtml = '';
       if (selected) {
         markerHtml = `<div class="mountain-marker">▼</div>`;
@@ -255,10 +315,10 @@ export class ShopUI {
           <div class="mountain-peak"></div>
         </div>
         <div class="mountain-info">
-          <div class="mountain-name">${m.name}</div>
+          <div class="mountain-name">${getMountainName(m.name)}</div>
           <div class="mountain-stats">
             ${m.height.toLocaleString()}m<br>
-            Push: <span style="color:${multiplierColor}">&times;${m.pushDistanceMultiplier}</span>
+            ${ui().push}: <span style="color:${multiplierColor}">&times;${m.pushDistanceMultiplier}</span>
           </div>
         </div>
       `;

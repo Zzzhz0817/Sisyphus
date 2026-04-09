@@ -1,6 +1,7 @@
 import { CheckpointConfig, CHECKPOINT_COLLECT_ANIMATION_DURATION } from '../config';
 import { PersistentState } from '../player/PlayerState';
 import { addCurrency } from '../player/CurrencyManager';
+import { ui } from '../i18n';
 
 export class CheckpointSystem {
   /** Checkpoint indices collected this run */
@@ -51,7 +52,7 @@ export class CheckpointSystem {
             persistent.claimedIngotCheckpoints[this.mountainIndex] = claimed;
             addCurrency(persistent, { ingot: cp.reward.ingot });
             runEarnings.ingot += cp.reward.ingot;
-            this.notification = `+${cp.reward.ingot} Ingot`;
+            this.notification = ui().ingotNotif(cp.reward.ingot);
             this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
           }
           if (cp.reward.obol) {
@@ -62,6 +63,8 @@ export class CheckpointSystem {
           addCurrency(persistent, cp.reward);
           if (cp.reward.obol) {
             runEarnings.obol += cp.reward.obol;
+            this.notification = ui().obolAcquired;
+            this.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION;
           }
         }
       }

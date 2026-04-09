@@ -1,4 +1,5 @@
 import { Renderer } from '../render/Renderer';
+import { ui } from '../i18n';
 import { JudgmentBar } from './JudgmentBar';
 import { StaminaSystem } from './StaminaSystem';
 import { SlideSystem } from './SlideSystem';
@@ -63,6 +64,9 @@ export class GameManager {
   private lastTime = 0;
   private totalTime = 0;
   private mouseDown = false;
+
+  // Tutorial hint
+  private tutorialHintActive = false;
 
   // Dual Push artifact state
   /** Which mouse button is currently held (0=left, 2=right, -1=none) */
@@ -140,142 +144,183 @@ export class GameManager {
     };
   }
 
+  /** Common logic for starting a push (shared by mouse and touch). */
+  private handlePushStart(button: number): void {
+    if (this.gameState !== 'climbing') return;
+    if (this.slideSystem.state === 'sliding') return;
+
+    // Accept left (0) always; accept right (2) only with Dual Push
+    if (button === 0 || (button === 2 && this.hasDualPush)) {
+      this.mouseDown = true;
+      this.currentButton = button;
+
+      // Determine if alternate bonus is active for this attempt
+      this.dualPushBonusActive =
+        this.hasDualPush &&
+        this.lastSuccessButton !== -1 &&
+        this.currentButton !== this.lastSuccessButton;
+
+      // Set crit state on both bar and UI
+      this.judgmentBar.critEnabled = this.hasCritHit;
+      this.judgmentBarUI.setCritEnabled(this.hasCritHit);
+
+      // Roll for divine blessing (1/3 chance when artifact equipped)
+      const blessed = this.hasBlessing && Math.random() < BLESSING_CHANCE;
+      this.judgmentBar.blessed = blessed;
+      this.judgmentBarUI.setBlessed(blessed);
+
+      this.judgmentBar.start(this.staminaSystem.getSuccessZoneWidth());
+
+      const headPos = this.renderer.getCharacterHeadScreen(this.run.visualHeight);
+      this.judgmentBarUI.show(headPos.sx, headPos.sy);
+
+      // Update pointer color for alternate bonus
+      this.judgmentBarUI.setAlternateBonus(this.dualPushBonusActive);
+    }
+  }
+
+  /** Common logic for ending a push (shared by mouse and touch). */
+  private handlePushEnd(button: number): void {
+    if (this.gameState !== 'climbing') return;
+    if (!this.mouseDown) return;
+    // Only respond to the button that started the press
+    if (button !== this.currentButton) return;
+
+    this.mouseDown = false;
+
+    const successZoneWidth = this.staminaSystem.getSuccessZoneWidth();
+    const result = this.judgmentBar.judge(successZoneWidth);
+    this.judgmentBarUI.hide();
+
+    // Mark attempted (starts slide timer if first attempt)
+    this.slideSystem.onAttempt();
+
+    if (result === 'success' || result === 'crit') {
+      this.run.pushSuccess++;
+
+      // Hide tutorial hint after first ever push
+      if (this.tutorialHintActive) {
+        this.tutorialHintActive = false;
+        this.hud.hideTutorialHint();
+      }
+
+      // Advance logical height (2x on crit)
+      const pushDist = this.getEffectivePushDistance() * (result === 'crit' ? CRIT_MULTIPLIER : 1);
+      this.run.logicalHeight += pushDist;
+      if (this.run.logicalHeight > this.run.peakHeight) {
+        this.run.peakHeight = this.run.logicalHeight;
+      }
+
+      // Start push animation
+      this.run.pushAnimFrom = this.run.visualHeight;
+      this.run.pushAnimElapsed = 0;
+      this.run.isPushAnimating = true;
+
+      // Consume stamina (half cost if alternate bonus)
+      this.staminaSystem.consumeOnSuccess(
+        this.dualPushBonusActive ? DUAL_PUSH_STAMINA_DISCOUNT : 1.0,
+      );
+
+      // Track last success button for alternating detection
+      this.lastSuccessButton = this.currentButton;
+
+      // Store push properties for continuous particle emission during animation
+      this.run.currentPushResult = result as 'success' | 'crit';
+      this.run.currentPushBlessed = this.judgmentBar.blessed;
+      this.run.currentPushDual = this.dualPushBonusActive;
+      this.run.currentPushDistance = pushDist;
+
+      if (result === 'crit') {
+        this.renderer.triggerFlash('#FFD700', 0.35); // Gold flash for crit
+      }
+
+      // Reset slide timer
+      this.slideSystem.onSuccess();
+
+      // Check checkpoints
+      this.checkpointSystem.checkProgress(
+        this.run.logicalHeight,
+        this.persistent,
+        this.run.runEarnings,
+      );
+
+      // Check summit
+      this.checkSummit();
+    } else {
+      this.run.pushFail++;
+      // If stamina depleted and player fails, force immediate slide
+      if (this.staminaSystem.getSuccessZoneWidth() <= 0) {
+        this.slideSystem.forceMaxSlide();
+      }
+    }
+
+    this.currentButton = -1;
+    this.dualPushBonusActive = false;
+  }
+
   private setupInput(): void {
     const canvas = this.renderer.canvas;
 
-    canvas.addEventListener('mousedown', (e) => {
-      if (this.gameState !== 'climbing') return;
-      if (this.slideSystem.state === 'sliding') return;
-
-      // Accept left (0) always; accept right (2) only with Dual Push
-      if (e.button === 0 || (e.button === 2 && this.hasDualPush)) {
-        this.mouseDown = true;
-        this.currentButton = e.button;
-
-        // Determine if alternate bonus is active for this attempt
-        this.dualPushBonusActive =
-          this.hasDualPush &&
-          this.lastSuccessButton !== -1 &&
-          this.currentButton !== this.lastSuccessButton;
-
-        // Set crit state on both bar and UI
-        this.judgmentBar.critEnabled = this.hasCritHit;
-        this.judgmentBarUI.setCritEnabled(this.hasCritHit);
-
-        // Roll for divine blessing (1/3 chance when artifact equipped)
-        const blessed = this.hasBlessing && Math.random() < BLESSING_CHANCE;
-        this.judgmentBar.blessed = blessed;
-        this.judgmentBarUI.setBlessed(blessed);
-
-        this.judgmentBar.start(this.staminaSystem.getSuccessZoneWidth());
-
-        const headPos = this.renderer.getCharacterHeadScreen(this.run.visualHeight);
-        this.judgmentBarUI.show(headPos.sx, headPos.sy);
-
-        // Update pointer color for alternate bonus
-        this.judgmentBarUI.setAlternateBonus(this.dualPushBonusActive);
-      }
-    });
-
-    canvas.addEventListener('mouseup', (e) => {
-      if (this.gameState !== 'climbing') return;
-      if (!this.mouseDown) return;
-      // Only respond to the button that started the press
-      if (e.button !== this.currentButton) return;
-
-      this.mouseDown = false;
-
-      const successZoneWidth = this.staminaSystem.getSuccessZoneWidth();
-      const result = this.judgmentBar.judge(successZoneWidth);
-      this.judgmentBarUI.hide();
-
-      // Mark attempted (starts slide timer if first attempt)
-      this.slideSystem.onAttempt();
-
-      if (result === 'success' || result === 'crit') {
-        this.run.pushSuccess++;
-
-        // Advance logical height (2x on crit)
-        const pushDist = this.getEffectivePushDistance() * (result === 'crit' ? CRIT_MULTIPLIER : 1);
-        this.run.logicalHeight += pushDist;
-        if (this.run.logicalHeight > this.run.peakHeight) {
-          this.run.peakHeight = this.run.logicalHeight;
-        }
-
-        // Start push animation
-        this.run.pushAnimFrom = this.run.visualHeight;
-        this.run.pushAnimElapsed = 0;
-        this.run.isPushAnimating = true;
-
-        // Consume stamina (half cost if alternate bonus)
-        this.staminaSystem.consumeOnSuccess(
-          this.dualPushBonusActive ? DUAL_PUSH_STAMINA_DISCOUNT : 1.0,
-        );
-
-        // Track last success button for alternating detection
-        this.lastSuccessButton = this.currentButton;
-
-        // Store push properties for continuous particle emission during animation
-        this.run.currentPushResult = result as 'success' | 'crit';
-        this.run.currentPushBlessed = this.judgmentBar.blessed;
-        this.run.currentPushDual = this.dualPushBonusActive;
-        this.run.currentPushDistance = pushDist;
-
-        if (result === 'crit') {
-          this.renderer.triggerFlash('#FFD700', 0.35); // Gold flash for crit
-        }
-
-        // Reset slide timer
-        this.slideSystem.onSuccess();
-
-        // Check checkpoints
-        this.checkpointSystem.checkProgress(
-          this.run.logicalHeight,
-          this.persistent,
-          this.run.runEarnings,
-        );
-
-        // Check summit
-        this.checkSummit();
-      } else {
-        this.run.pushFail++;
-        // If stamina depleted and player fails, force immediate slide
-        if (this.staminaSystem.getSuccessZoneWidth() <= 0) {
-          this.slideSystem.forceMaxSlide();
-        }
-      }
-
-      this.currentButton = -1;
-      this.dualPushBonusActive = false;
-    });
-
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    // Debug key: Space = instant push +40 (debug)
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && this.gameState === 'climbing') {
+    if (__MOBILE__) {
+      // --- Mobile: touch input ---
+      canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        this.run.logicalHeight += 40;
-        if (this.run.logicalHeight > this.run.peakHeight) {
-          this.run.peakHeight = this.run.logicalHeight;
+        const touch = e.changedTouches[0];
+        // Without Dual Push: both sides act as left button (0)
+        // With Dual Push equipped: left half = 0, right half = 2 (for alternating bonus)
+        const button = this.hasDualPush
+          ? (touch.clientX < window.innerWidth / 2 ? 0 : 2)
+          : 0;
+        this.handlePushStart(button);
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        this.handlePushEnd(this.currentButton);
+      }, { passive: false });
+
+      canvas.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        this.handlePushEnd(this.currentButton);
+      }, { passive: false });
+    } else {
+      // --- Desktop: mouse input ---
+      canvas.addEventListener('mousedown', (e) => {
+        this.handlePushStart(e.button);
+      });
+
+      canvas.addEventListener('mouseup', (e) => {
+        this.handlePushEnd(e.button);
+      });
+
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      // Debug key: Space = instant push +40 (debug)
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && this.gameState === 'climbing') {
+          e.preventDefault();
+          this.run.logicalHeight += 40;
+          if (this.run.logicalHeight > this.run.peakHeight) {
+            this.run.peakHeight = this.run.logicalHeight;
+          }
+          this.run.pushAnimFrom = this.run.visualHeight;
+          this.run.pushAnimElapsed = 0;
+          this.run.isPushAnimating = true;
+          this.run.pushSuccess++;
+
+          // Reset slide timer so debug push counts as success
+          this.slideSystem.onAttempt();
+          this.slideSystem.onSuccess();
+
+          this.checkpointSystem.checkProgress(
+            this.run.logicalHeight,
+            this.persistent,
+            this.run.runEarnings,
+          );
+          this.checkSummit();
         }
-        this.run.pushAnimFrom = this.run.visualHeight;
-        this.run.pushAnimElapsed = 0;
-        this.run.isPushAnimating = true;
-        this.run.pushSuccess++;
-
-        // Reset slide timer so debug push counts as success
-        this.slideSystem.onAttempt();
-        this.slideSystem.onSuccess();
-
-        this.checkpointSystem.checkProgress(
-          this.run.logicalHeight,
-          this.persistent,
-          this.run.runEarnings,
-        );
-        this.checkSummit();
-      }
-    });
+      });
+    }
   }
 
   /** Check if player has reached the mountain summit */
@@ -302,7 +347,7 @@ export class GameManager {
       }
 
       // Show summit notification
-      this.checkpointSystem.notification = `Summit! +${mountain.summitIngotReward} Ingot`;
+      this.checkpointSystem.notification = ui().summitNotif(mountain.summitIngotReward);
       this.checkpointSystem.notificationTimer = CHECKPOINT_COLLECT_ANIMATION_DURATION * 3;
     }
 
@@ -357,6 +402,12 @@ export class GameManager {
 
     // Update HUD mountain name
     this.hud.setMountainName(mountain.name);
+
+    // Show tutorial hint on the very first run
+    if (this.persistent.totalRuns === 1) {
+      this.tutorialHintActive = true;
+      this.hud.showTutorialHint(ui().tutorialHint);
+    }
   }
 
   private endRun(): void {

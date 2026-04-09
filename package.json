@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:mobile": "tsc && vite build --config vite.mobile.config.ts",
+    "build:sisyphus": "tsc && vite build --config vite.sisyphus.config.ts",
     "preview": "vite preview"
   },
   "devDependencies": {
