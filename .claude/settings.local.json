@@ -12,7 +12,8 @@
       "WebFetch(domain:osu.ppy.sh)",
       "WebFetch(domain:brill.com)",
       "WebFetch(domain:cdn.carleton.edu)",
-      "WebFetch(domain:www2.oberlin.edu)"
+      "WebFetch(domain:www2.oberlin.edu)",
+      "Bash(python simulate.py)"
     ]
   }
 }
